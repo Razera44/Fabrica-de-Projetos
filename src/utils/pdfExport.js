@@ -80,7 +80,7 @@ function sectionHead(doc, index, title, x, y, width) {
   doc.setLineDashPattern([], 0)
 }
 
-export function exportResultsPdf({ companyName, issuedAt, overall, themeScores, actionPlan }) {
+export function exportResultsPdf({ companyName, responsavel, issuedAt, overall, themeScores, actionPlan }) {
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
   registerFont(doc)
   paintBackground(doc)
@@ -112,6 +112,12 @@ export function exportResultsPdf({ companyName, issuedAt, overall, themeScores, 
   doc.setTextColor(...INK_LO)
   doc.text(`EMITIDO EM ${issuedAt.toUpperCase()}`, marginX, y + 13, { charSpace: 0.4 })
   y += 30
+
+  if (responsavel) {
+    const line = doc.splitTextToSize(`RESPONSÁVEL: ${responsavel}`, contentWidth)[0]
+    doc.text(line, marginX, y - 4, { charSpace: 0.4 })
+    y += 14
+  }
 
   doc.setDrawColor(...LINE)
   doc.line(marginX, y, pageWidth - marginX, y)

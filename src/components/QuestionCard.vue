@@ -451,7 +451,7 @@ export default {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.22), transparent);
+  background: linear-gradient(90deg, transparent, rgba(var(--fx), 0.22), transparent);
   transform: translateX(-100%);
   animation: slot-flash 0.55s var(--ease) 1;
   pointer-events: none;

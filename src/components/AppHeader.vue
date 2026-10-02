@@ -13,6 +13,30 @@
 
       <span class="bar__tag">Diagnóstico de segurança digital</span>
       <span class="bar__strip"></span>
+
+      <button
+        class="theme-toggle"
+        :class="{ 'is-light': isLight }"
+        type="button"
+        :aria-label="toggleLabel"
+        :title="toggleLabel"
+        @click="toggleTheme"
+      >
+        <span class="theme-toggle__track" aria-hidden="true">
+          <span class="theme-toggle__opt" :class="{ 'is-on': !isLight }">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+              <path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <span class="theme-toggle__opt" :class="{ 'is-on': isLight }">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2"/>
+              <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </span>
+        </span>
+      </button>
+
       <span class="bar__leds"><i></i><i></i><i></i></span>
     </div>
 
@@ -35,6 +59,10 @@
 </template>
 
 <script>
+import { loadTheme, saveTheme } from '../utils/storage.js'
+
+const META_COLOR = { dark: '#0a0a0a', light: '#ebe9e3' }
+
 export default {
   name: 'AppHeader',
   props: {
@@ -54,8 +82,37 @@ export default {
     return {
       // identificador da execução: decorativo, dá contexto de sessão
       sessionId: '0x' + Math.floor(Math.random() * 0xfff).toString(16).toUpperCase().padStart(3, '0'),
-      startedAt: `${p(d.getHours())}:${p(d.getMinutes())}`
+      startedAt: `${p(d.getHours())}:${p(d.getMinutes())}`,
+      // o index.html já aplicou o tema salvo; aqui só se lê o estado atual
+      theme: document.documentElement.getAttribute('data-theme') || loadTheme()
     }
+  },
+  computed: {
+    isLight() {
+      return this.theme === 'light'
+    },
+    toggleLabel() {
+      return this.isLight ? 'Mudar para o tema escuro' : 'Mudar para o tema claro'
+    }
+  },
+  methods: {
+    toggleTheme() {
+      const root = document.documentElement
+      this.theme = this.isLight ? 'dark' : 'light'
+
+      // liga a transição de cor só durante a troca
+      root.classList.add('theme-fade')
+      root.setAttribute('data-theme', this.theme)
+      clearTimeout(this.fadeTimer)
+      this.fadeTimer = setTimeout(() => root.classList.remove('theme-fade'), 320)
+
+      const meta = document.querySelector('meta[name="theme-color"]')
+      if (meta) meta.setAttribute('content', META_COLOR[this.theme])
+      saveTheme(this.theme)
+    }
+  },
+  beforeUnmount() {
+    clearTimeout(this.fadeTimer)
   }
 }
 </script>
@@ -140,7 +197,7 @@ export default {
   bottom: 0;
   left: 0;
   right: -9.9px;
-  background-image: repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.30) 0 1px, transparent 1px 7px);
+  background-image: repeating-linear-gradient(-45deg, rgba(var(--fx), var(--hatch-a)) 0 1px, transparent 1px 7px);
   background-size: 9.9px 9.9px;
   will-change: transform;
   animation: hatch-run 3.2s linear infinite;
@@ -151,6 +208,50 @@ export default {
     animation: none;
     transform: none;
   }
+}
+
+/* botão de tema: a área clicável ocupa a altura toda da faixa; o desenho
+   é um seletor de duas posições (lua / sol) com a ativa preenchida */
+.theme-toggle {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.theme-toggle__track {
+  display: flex;
+  border: 1px solid var(--line-strong);
+  transition: border-color var(--dur) var(--ease);
+}
+
+.theme-toggle:hover .theme-toggle__track {
+  border-color: var(--accent-line);
+}
+
+.theme-toggle:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -4px;
+}
+
+.theme-toggle__opt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 22px;
+  color: var(--ink-lo);
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+
+.theme-toggle__opt.is-on {
+  background: var(--accent);
+  color: var(--accent-ink);
 }
 
 .bar__leds {
@@ -173,7 +274,7 @@ export default {
 .bar__leds i:nth-child(3) { animation-delay: 2.4s; }
 
 @keyframes led-seq-bar {
-  0%, 22% { opacity: 1; box-shadow: 0 0 10px 1px rgba(255, 255, 255, 0.9); }
+  0%, 22% { opacity: 1; box-shadow: 0 0 10px 1px rgba(var(--fx), calc(0.9 * var(--glow-k))); }
   23%, 100% { opacity: 0.22; box-shadow: none; }
 }
 

@@ -79,7 +79,46 @@
             </div>
           </div>
 
-          <footer class="ifoot rise" style="--i: 6">
+          <div class="ifield rise" style="--i: 6">
+            <label class="ifield__label" for="responsavel">
+              <span class="ifield__num">02</span> Responsável
+            </label>
+            <div
+              class="ifield__wrap"
+              :class="{ 'is-error': showError, 'is-filled': responsavel.trim() }"
+            >
+              <span class="ifield__prefix" aria-hidden="true">&gt;</span>
+              <input
+                id="responsavel"
+                ref="responsavelInput"
+                v-model="responsavel"
+                class="ifield__input"
+                type="text"
+                autocomplete="name"
+                maxlength="80"
+                required
+                aria-required="true"
+                :aria-invalid="showError ? 'true' : 'false'"
+                :aria-describedby="showError ? 'responsavel-help responsavel-error' : 'responsavel-help'"
+                placeholder="Nome do responsável"
+                @input="showError = false"
+                @keyup.enter="handleStart"
+              >
+              <span class="ifield__caret" :class="{ 'is-idle': !responsavel && name.trim() }" aria-hidden="true"></span>
+            </div>
+            <p id="responsavel-help" class="ifield__help">
+              Quem responde por esta avaliação. O nome aparece no resultado e no histórico.
+            </p>
+            <p v-if="showError" id="responsavel-error" class="ifield__error" role="alert">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 3 2.5 20h19L12 3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                <path d="M12 10v4.5M12 17.5v.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              Informe o nome do responsável para iniciar o diagnóstico.
+            </p>
+          </div>
+
+          <footer class="ifoot rise" style="--i: 7">
             <span class="hint">
               <span class="key key--wide">ENTER</span>
               <em>iniciar diagnóstico</em>
@@ -107,12 +146,18 @@ export default {
     initialName: {
       type: String,
       default: ''
+    },
+    initialResponsavel: {
+      type: String,
+      default: ''
     }
   },
   emits: ['start'],
   data() {
     return {
-      name: this.initialName
+      name: this.initialName,
+      responsavel: this.initialResponsavel,
+      showError: false
     }
   },
   mounted() {
@@ -123,21 +168,26 @@ export default {
   },
   methods: {
     handleStart() {
-      if (!this.name.trim()) return
-      this.$emit('start', this.name.trim())
+      if (!this.name.trim()) {
+        this.$refs.input.focus()
+        return
+      }
+      // sem responsável não inicia: mostra o aviso e leva o foco ao campo
+      if (!this.responsavel.trim()) {
+        this.showError = true
+        this.$refs.responsavelInput.focus()
+        return
+      }
+      this.$emit('start', { name: this.name.trim(), responsavel: this.responsavel.trim() })
     },
     // Enter inicia mesmo com o foco fora do campo; sem nome, foca o campo
     onKey(event) {
       if (event.key !== 'Enter' || event.metaKey || event.ctrlKey) return
       const tag = (event.target.tagName || '').toLowerCase()
-      if (tag === 'input') return
-      if (this.name.trim()) {
-        event.preventDefault()
-        this.handleStart()
-      } else if (this.$refs.input) {
-        event.preventDefault()
-        this.$refs.input.focus()
-      }
+      // botões (inclusive o de tema) tratam o próprio Enter
+      if (tag === 'input' || tag === 'button') return
+      event.preventDefault()
+      this.handleStart()
     }
   }
 }
@@ -260,6 +310,11 @@ export default {
   padding: 20px 22px 20px;
 }
 
+/* o segundo campo encosta no primeiro: os dois formam um bloco só */
+.ifield + .ifield {
+  padding-top: 0;
+}
+
 .ifield__label {
   display: flex;
   align-items: center;
@@ -282,16 +337,59 @@ export default {
   display: flex;
   align-items: center;
   gap: 10px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--field-line);
   background: var(--panel);
   padding: 0 16px;
   clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
-  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
+}
+
+.ifield__wrap:hover {
+  border-color: var(--field-line-hover);
 }
 
 .ifield__wrap:focus-within {
   border-color: var(--accent-line);
   background: var(--panel-hover);
+  /* o clip-path corta o outline: a espessura extra vem de uma sombra interna */
+  box-shadow: inset 0 0 0 1px var(--accent-line);
+}
+
+.ifield__wrap.is-filled:not(:focus-within) {
+  border-color: var(--field-line-hover);
+}
+
+/* erro: cor + ícone + texto; a borda mais grossa também sinaliza sem cor */
+.ifield__wrap.is-error,
+.ifield__wrap.is-error:hover,
+.ifield__wrap.is-error:focus-within {
+  border-color: var(--crit);
+  box-shadow: inset 0 0 0 1px var(--crit);
+}
+
+.ifield__help,
+.ifield__error {
+  margin-top: 9px;
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
+.ifield__help {
+  color: var(--ink-lo);
+}
+
+.ifield__error {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  color: var(--crit);
+  animation: rise var(--dur) var(--ease) both;
+}
+
+.ifield__error svg {
+  flex-shrink: 0;
+  margin-top: 3px;
 }
 
 .ifield__prefix {
@@ -311,7 +409,7 @@ export default {
 }
 
 .ifield__input::placeholder {
-  color: var(--ink-faint);
+  color: var(--ink-ph);
 }
 
 .ifield__input:focus {

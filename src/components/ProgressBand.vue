@@ -64,7 +64,7 @@ export default {
   position: sticky;
   top: 0;
   z-index: 5;
-  background: linear-gradient(180deg, var(--bg) 55%, rgba(8, 9, 10, 0.88));
+  background: linear-gradient(180deg, var(--bg) 55%, rgba(var(--bg-rgb), 0.88));
 }
 
 .band__inner {
@@ -122,7 +122,7 @@ export default {
 
 .band__cell.is-now {
   background: var(--accent);
-  box-shadow: 0 0 10px rgba(255, 255, 255, 0.55);
+  box-shadow: 0 0 10px rgba(var(--fx), calc(0.55 * var(--glow-k)));
 }
 
 @media (max-width: 520px) {

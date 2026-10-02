@@ -8,9 +8,9 @@
     <svg class="gauge__svg" viewBox="0 0 280 176" role="img" :aria-label="`Nota ${score} de 100 — ${tier.label}`">
       <defs>
         <linearGradient id="gaugeScale" gradientUnits="userSpaceOnUse" x1="28" y1="0" x2="252" y2="0">
-          <stop offset="0%" stop-color="#e2707a" />
-          <stop offset="48%" stop-color="#e5bb63" />
-          <stop offset="100%" stop-color="#4fdd76" />
+          <stop offset="0%" style="stop-color: var(--g-crit)" />
+          <stop offset="48%" style="stop-color: var(--g-warn)" />
+          <stop offset="100%" style="stop-color: var(--g-safe)" />
         </linearGradient>
         <filter id="gaugeGlow" x="-30%" y="-30%" width="160%" height="160%">
           <feGaussianBlur stdDeviation="3" result="b" />
@@ -57,9 +57,9 @@
       />
 
       <!-- marcador na posição exata da nota -->
-      <circle :cx="marker.x" :cy="marker.y" r="7" class="gauge__marker-halo" :style="{ fill: tierColor }" />
-      <circle :cx="marker.x" :cy="marker.y" r="4" :style="{ fill: tierColor }" />
-      <circle :cx="marker.x" :cy="marker.y" r="1.6" fill="#0a0a0a" />
+      <circle :cx="marker.x" :cy="marker.y" r="7" class="gauge__marker-halo" :style="{ fill: markerColor }" />
+      <circle :cx="marker.x" :cy="marker.y" r="4" :style="{ fill: markerColor }" />
+      <circle :cx="marker.x" :cy="marker.y" r="1.6" class="gauge__marker-core" />
 
       <!-- leitura principal -->
       <text class="gauge__score" x="140" y="124" text-anchor="middle">{{ Math.round(display) }}</text>
@@ -107,6 +107,10 @@ export default {
     },
     tierColor() {
       return `var(--${this.tier.tone})`
+    },
+    // marcador na cor do arco (mais viva que a do texto, que precisa de contraste)
+    markerColor() {
+      return `var(--g-${this.tier.tone})`
     },
     // ponto exato sobre o arco para o valor atualmente exibido
     marker() {
@@ -189,17 +193,21 @@ export default {
 }
 
 .gauge__track {
-  stroke: rgba(244, 244, 239, 0.08);
+  stroke: rgba(var(--ink-rgb), 0.08);
 }
 
 .gauge__ticks line {
-  stroke: rgba(244, 244, 239, 0.16);
+  stroke: rgba(var(--ink-rgb), 0.16);
   stroke-width: 1;
 }
 
 .gauge__ticks line.is-major {
-  stroke: rgba(244, 244, 239, 0.32);
+  stroke: rgba(var(--ink-rgb), 0.32);
   stroke-width: 1.4;
+}
+
+.gauge__marker-core {
+  fill: var(--accent-ink);
 }
 
 .gauge__marker-halo {

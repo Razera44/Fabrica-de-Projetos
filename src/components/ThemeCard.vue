@@ -70,12 +70,12 @@ export default {
 }
 
 .row--theme:hover {
-  background: rgba(255, 255, 255, 0.018);
+  background: rgba(var(--fx), 0.018);
 }
 
 /* o tema mais frágil é marcado pela tarja, não por uma borda diferente */
 .row--weak {
-  background: rgba(255, 255, 255, 0.028);
+  background: rgba(var(--fx), 0.028);
   box-shadow: inset 3px 0 0 var(--crit);
 }
 
@@ -97,7 +97,7 @@ export default {
 .theme__track {
   display: block;
   height: 6px;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(var(--fx), 0.06);
 }
 
 /* span é inline por padrão: sem display block a barra fica com 0px */

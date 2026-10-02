@@ -31,6 +31,9 @@
                 <div class="readout">
                   <span class="readout__k">Itens</span><span class="readout__dots"></span><span class="readout__v">20/20</span>
                 </div>
+                <div v-if="responsavel" class="readout results__resp">
+                  <span class="readout__k">Responsável</span><span class="readout__dots"></span><span class="readout__v">{{ responsavel }}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -154,6 +157,10 @@ export default {
       type: String,
       required: true
     },
+    responsavel: {
+      type: String,
+      default: ''
+    },
     themeScores: {
       type: Object,
       required: true
@@ -214,6 +221,7 @@ export default {
 
       exportResultsPdf({
         companyName: this.companyName,
+        responsavel: this.responsavel,
         issuedAt: this.issuedAt,
         overall: this.overall,
         themeScores: this.themeScores,
@@ -254,6 +262,17 @@ export default {
   gap: 4px 26px;
   padding-top: 13px;
   border-top: 1px solid var(--line);
+}
+
+/* nome livre: ocupa a linha toda e quebra em vez de vazar */
+.results__resp {
+  grid-column: 1 / -1;
+}
+
+.results__resp .readout__v {
+  white-space: normal;
+  text-align: right;
+  overflow-wrap: anywhere;
 }
 
 .results__gauge :deep(.gauge) {

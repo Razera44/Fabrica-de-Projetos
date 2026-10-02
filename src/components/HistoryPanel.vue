@@ -10,7 +10,7 @@
       <!-- a linha é desenhada esticada; os pontos são HTML posicionado em %,
            senão o preserveAspectRatio="none" achataria os círculos -->
       <svg class="hist__line" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-        <polyline :points="linePoints" fill="none" stroke="rgba(255,255,255,.32)" stroke-width="0.6" vector-effect="non-scaling-stroke" />
+        <polyline :points="linePoints" fill="none" stroke-width="0.6" vector-effect="non-scaling-stroke" />
       </svg>
 
       <span
@@ -29,6 +29,15 @@
       <b>{{ deltaText }}</b>
       <span>desde a 1ª</span>
     </div>
+
+    <!-- registro das últimas avaliações: data, responsável e nota -->
+    <ul class="hist__log" aria-label="Avaliações recentes">
+      <li v-for="e in log" :key="e.date" class="hist__item">
+        <span class="hist__when">{{ e.day }}</span>
+        <span class="hist__who" :class="{ 'is-empty': !e.responsavel }">{{ e.responsavel || 'não informado' }}</span>
+        <span class="hist__score">{{ e.overall }}/100</span>
+      </li>
+    </ul>
   </div>
 </template>
 
@@ -71,6 +80,17 @@ export default {
         color: `var(--${getTier(entry.overall).tone})`
       }))
     },
+    // mais recente primeiro
+    log() {
+      return this.recentEntries
+        .map(e => ({
+          date: e.date,
+          overall: e.overall,
+          responsavel: e.responsavel,
+          day: new Date(e.date).toLocaleDateString('pt-BR')
+        }))
+        .reverse()
+    },
     linePoints() {
       return this.points.map(p => `${p.x},${100 - p.y}`).join(' ')
     },
@@ -109,6 +129,10 @@ export default {
 .hist__plot {
   position: relative;
   height: 108px;
+}
+
+.hist__line polyline {
+  stroke: rgba(var(--fx), 0.32);
 }
 
 .hist__line {
@@ -161,6 +185,52 @@ export default {
   letter-spacing: 0.12em;
   color: var(--ink-faint);
   white-space: nowrap;
+}
+
+/* ocupa a linha de baixo da grade, sem competir com o gráfico */
+.hist__log {
+  grid-column: 1 / -1;
+  list-style: none;
+  border-top: 1px solid var(--line-soft);
+  margin-top: 4px;
+}
+
+.hist__item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: baseline;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.hist__item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.hist__when {
+  color: var(--ink-lo);
+  font-variant-numeric: tabular-nums;
+}
+
+.hist__who {
+  color: var(--ink-mid);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hist__who.is-empty {
+  color: var(--ink-lo);
+  font-style: italic;
+}
+
+.hist__score {
+  color: var(--ink);
+  font-weight: 500;
 }
 
 .hist__delta {

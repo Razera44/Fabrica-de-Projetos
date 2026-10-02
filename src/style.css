@@ -42,6 +42,25 @@
   --safe: #4fdd76;
   --safe-bg: rgba(79, 221, 118, 0.1);
 
+  /* arco e marcador do medidor (no escuro, as mesmas cores das faixas) */
+  --g-crit: #e2707a;
+  --g-warn: #e5bb63;
+  --g-safe: #4fdd76;
+
+  /* componentes de cor usados em rgba(var(--x), alfa): no escuro, o branco
+     e os tons de risco originais */
+  --fx: 255, 255, 255;
+  --ink-rgb: 244, 244, 242;
+  --bg-rgb: 8, 9, 10;
+  --crit-rgb: 226, 112, 122;
+  --glow-k: 1;      /* intensidade dos brilhos de LED */
+  --hatch-a: 0.3;   /* opacidade das hachuras */
+  --ink-ph: rgba(244, 244, 242, 0.2); /* placeholder */
+  --vignette: rgba(5, 5, 5, 0.74);
+  --sel: rgba(255, 255, 255, 0.16);
+  --field-line: var(--line);
+  --field-line-hover: var(--line-strong);
+
   /* raios: quase retos, o desenho é de painel técnico */
   --r-sm: 2px;
   --r-md: 3px;
@@ -58,6 +77,78 @@
   --dur-fast: 160ms;
   --dur: 300ms;
   --dur-slow: 440ms;
+}
+
+/* ============================================================
+   TEMA CLARO
+   Mesma estrutura do escuro, trocando só a paleta. Papel quente em vez
+   de branco puro; a "tela embutida" vira o degrau mais claro (no escuro
+   ela é o mais escuro) e o acento passa a ser a tinta escura.
+   Tons de risco escurecidos para manter contraste sobre fundo claro.
+   ============================================================ */
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --bg: #ebe9e3;
+  --bg-deep: #dfdcd5;
+  --panel-deep: #fcfbf8;
+  --panel: #f4f2ed;
+  --panel-hover: #ece9e2;
+  --panel-strong: #e1ded6;
+
+  --line: rgba(20, 22, 26, 0.16);
+  --line-soft: rgba(20, 22, 26, 0.08);
+  --line-strong: rgba(20, 22, 26, 0.3);
+
+  --ink: #14161a;
+  --ink-mid: rgba(20, 22, 26, 0.76);
+  --ink-lo: rgba(20, 22, 26, 0.66);
+  --ink-faint: rgba(20, 22, 26, 0.6);
+
+  --accent: #14161a;
+  --accent-ink: #f4f3ef;
+  --accent-soft: rgba(20, 22, 26, 0.06);
+  --accent-line: rgba(20, 22, 26, 0.55);
+
+  --crit: #b3303f;
+  --crit-bg: rgba(179, 48, 63, 0.09);
+  --warn: #85590a;
+  --warn-bg: rgba(133, 89, 10, 0.1);
+  --safe: #137536;
+  --safe-bg: rgba(23, 128, 61, 0.09);
+
+  --g-crit: #f0707e;
+  --g-warn: #f5bd4f;
+  --g-safe: #45c97c;
+
+  --fx: 20, 22, 26;
+  --ink-rgb: 20, 22, 26;
+  --bg-rgb: 235, 233, 227;
+  --crit-rgb: 179, 48, 63;
+  --glow-k: 0.35;
+  --hatch-a: 0.24;
+  --ink-ph: rgba(20, 22, 26, 0.6);
+  --field-line: rgba(20, 22, 26, 0.5);
+  --field-line-hover: rgba(20, 22, 26, 0.66);
+  --vignette: rgba(120, 116, 106, 0.16);
+  --sel: rgba(20, 22, 26, 0.14);
+}
+
+:root[data-theme='light'] .btn--primary:disabled {
+  color: rgba(var(--ink-rgb), 0.4);
+}
+
+/* troca de tema: transição curta só de cor, ligada pelo AppHeader durante
+   a troca e removida logo depois (não interfere nas animações da interface) */
+@media (prefers-reduced-motion: no-preference) {
+  html.theme-fade,
+  html.theme-fade *,
+  html.theme-fade *::before,
+  html.theme-fade *::after {
+    transition: background-color 280ms ease, color 280ms ease, border-color 280ms ease,
+      fill 280ms ease, stroke 280ms ease, box-shadow 280ms ease !important;
+  }
 }
 
 * {
@@ -100,7 +191,7 @@ input {
 }
 
 ::selection {
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--sel);
 }
 
 /* ============================================================
@@ -294,7 +385,7 @@ input {
 .frame__led--bl { bottom: 7px; left: 7px; animation-delay: 3.6s; }
 
 @keyframes led-seq {
-  0%, 18% { opacity: 1; box-shadow: 0 0 12px 2px rgba(255, 255, 255, 0.9); }
+  0%, 18% { opacity: 1; box-shadow: 0 0 12px 2px rgba(var(--fx), calc(0.9 * var(--glow-k))); }
   19%, 100% { opacity: 0.22; box-shadow: none; }
 }
 
@@ -318,7 +409,7 @@ input {
 .frame__led--solo[data-led='4'] { animation-delay: 0.6s; }
 
 @keyframes led-solo {
-  0%, 14% { opacity: 1; box-shadow: 0 0 12px 2px rgba(255, 255, 255, 0.85); }
+  0%, 14% { opacity: 1; box-shadow: 0 0 12px 2px rgba(var(--fx), calc(0.85 * var(--glow-k))); }
   15%, 100% { opacity: 0.22; box-shadow: none; }
 }
 
@@ -331,7 +422,7 @@ input {
   height: 110px;
   z-index: 0;
   pointer-events: none;
-  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+  background: linear-gradient(180deg, transparent, rgba(var(--fx), calc(0.05 * var(--glow-k))), transparent);
   animation: frame-sweep 9s linear infinite;
 }
 
@@ -452,7 +543,7 @@ input {
 @keyframes qpanel-in { from { opacity: 0; } to { opacity: 1; } }
 
 @keyframes led-land {
-  0% { opacity: 1; box-shadow: 0 0 14px 2px rgba(255, 255, 255, 0.95); }
+  0% { opacity: 1; box-shadow: 0 0 14px 2px rgba(var(--fx), calc(0.95 * var(--glow-k))); }
   30% { opacity: 0.22; box-shadow: none; }
   100% { opacity: 0.22; }
 }
@@ -526,7 +617,7 @@ input {
   right: -9.9px;
   background-image: repeating-linear-gradient(
     -45deg,
-    rgba(255, 255, 255, 0.30) 0 1px,
+    rgba(var(--fx), var(--hatch-a)) 0 1px,
     transparent 1px 7px
   );
   background-size: 9.9px 9.9px;
@@ -585,7 +676,7 @@ input {
 }
 
 .card--crit {
-  border-color: rgba(226, 112, 122, 0.32);
+  border-color: rgba(var(--crit-rgb), 0.32);
   background: linear-gradient(180deg, var(--crit-bg), transparent 68%), var(--panel);
 }
 
@@ -673,7 +764,7 @@ input {
   gap: 6px 22px;
   padding: 11px 18px;
   border-top: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.015);
+  background: rgba(var(--fx), 0.015);
   font-size: 10px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -945,7 +1036,7 @@ input {
 
 .is-scrambling {
   color: var(--ink-mid);
-  text-shadow: 0 0 16px rgba(255, 255, 255, 0.3);
+  text-shadow: 0 0 16px rgba(var(--fx), calc(0.3 * var(--glow-k)));
 }
 
 /* ============================================================

@@ -1,5 +1,6 @@
 const COMPANY_KEY = 'segura_empresa'
 const HISTORY_KEY = 'segura_historico'
+const THEME_KEY = 'segura_tema'
 
 // Total de avaliações guardadas, somando TODAS as empresas (cada uma exibe
 // só as suas na tela, mas o armazenamento é um único array).
@@ -36,12 +37,34 @@ export function saveCompanyName(name) {
   }
 }
 
+export function loadTheme() {
+  try {
+    return localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark'
+  } catch {
+    return 'dark'
+  }
+}
+
+export function saveTheme(theme) {
+  try {
+    localStorage.setItem(THEME_KEY, theme)
+  } catch {
+    // silenciosamente ignorado — ver loadCompanyName
+  }
+}
+
+// Avaliações salvas antes do campo "Responsável" não têm a propriedade:
+// aqui ela ganha o valor vazio, sem mexer no que está gravado.
+function withDefaults(entry) {
+  return { ...entry, responsavel: entry.responsavel || '' }
+}
+
 // Histórico de uma empresa específica. Cada avaliação salva carrega o nome
 // da empresa junto, então o "Histórico de avaliações" de uma empresa nunca
 // mistura notas de outra.
 export function loadHistory(companyName) {
   const all = loadAllHistory()
-  return all.filter(entry => sameCompany(entry.companyName, companyName))
+  return all.filter(entry => sameCompany(entry.companyName, companyName)).map(withDefaults)
 }
 
 export function saveAssessment(entry) {
@@ -58,5 +81,5 @@ export function saveAssessment(entry) {
     // assim — a tela de resultados já teve o dado pra exibir
   }
 
-  return trimmed.filter(e => sameCompany(e.companyName, entry.companyName))
+  return trimmed.filter(e => sameCompany(e.companyName, entry.companyName)).map(withDefaults)
 }

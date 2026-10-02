@@ -58,17 +58,17 @@ export default {
 }
 
 .row--plan:hover {
-  background: rgba(255, 255, 255, 0.018);
+  background: rgba(var(--fx), 0.018);
 }
 
 /* o item mais frágil ganha tarja lateral em vez de uma caixa própria */
 .row--first {
-  background: rgba(226, 112, 122, 0.055);
+  background: rgba(var(--crit-rgb), 0.055);
   box-shadow: inset 3px 0 0 var(--crit);
 }
 
 .row--first:hover {
-  background: rgba(226, 112, 122, 0.08);
+  background: rgba(var(--crit-rgb), 0.08);
 }
 
 .rnum {
@@ -88,7 +88,7 @@ export default {
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--crit);
-  border: 1px solid rgba(226, 112, 122, 0.45);
+  border: 1px solid rgba(var(--crit-rgb), 0.45);
   padding: 1px 6px;
 }
 

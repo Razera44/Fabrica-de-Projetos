@@ -19,6 +19,7 @@
             v-if="view === 'intro'"
             key="intro"
             :initial-name="companyName"
+            :initial-responsavel="responsavel"
             @start="handleStart"
           />
 
@@ -45,6 +46,7 @@
             v-else-if="view === 'results'"
             key="results"
             :company-name="companyName"
+            :responsavel="responsavel"
             :theme-scores="themeScores"
             :overall="overall"
             :history="history"
@@ -78,6 +80,7 @@ export default {
       view: 'intro',
       questions,
       companyName: '',
+      responsavel: '',
       current: 0,
       answers: new Array(questions.length).fill(null),
       history: [],
@@ -102,8 +105,9 @@ export default {
     this.history = loadHistory(this.companyName)
   },
   methods: {
-    handleStart(name) {
+    handleStart({ name, responsavel }) {
       this.companyName = name
+      this.responsavel = responsavel
       saveCompanyName(name)
       this.history = loadHistory(name)
       this.answers = new Array(this.questions.length).fill(null)
@@ -142,7 +146,8 @@ export default {
         date: new Date().toISOString(),
         overall: this.overall,
         themeScores: this.themeScores,
-        companyName: this.companyName
+        companyName: this.companyName,
+        responsavel: this.responsavel
       })
       this.view = 'results'
     },

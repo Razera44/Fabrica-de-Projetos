@@ -198,7 +198,7 @@ export default {
   height: 62vmax;
   top: -26vmax;
   left: -18vmax;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.022) 38%, transparent 70%);
+  background: radial-gradient(circle, rgba(var(--fx), 0.05), rgba(var(--fx), 0.022) 38%, transparent 70%);
   animation: drift-a 34s ease-in-out infinite alternate;
 }
 
@@ -207,7 +207,7 @@ export default {
   height: 54vmax;
   bottom: -24vmax;
   right: -16vmax;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.016) 38%, transparent 70%);
+  background: radial-gradient(circle, rgba(var(--fx), 0.035), rgba(var(--fx), 0.016) 38%, transparent 70%);
   animation: drift-b 42s ease-in-out infinite alternate;
 }
 
@@ -316,7 +316,7 @@ export default {
   left: 0;
   right: 0;
   height: 240px;
-  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.028), transparent);
+  background: linear-gradient(180deg, transparent, rgba(var(--fx), calc(0.028 * var(--glow-k))), transparent);
   animation: scan 22s linear infinite;
   will-change: transform;
 }
@@ -338,7 +338,7 @@ export default {
 .ambient__vignette {
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse 100% 80% at 50% 40%, transparent 40%, rgba(5, 5, 5, 0.74) 100%);
+  background: radial-gradient(ellipse 100% 80% at 50% 40%, transparent 40%, var(--vignette) 100%);
 }
 
 /* telas pequenas costumam ter GPU mais modesta: menos sinais simultâneos */
