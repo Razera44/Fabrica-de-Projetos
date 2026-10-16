@@ -47,6 +47,14 @@
   --g-warn: #e5bb63;
   --g-safe: #4fdd76;
 
+  /* série de referência/comparação (azul): nunca se confunde com as
+     faixas de risco, que usam verde/âmbar/vermelho */
+  --ref: #60a5fa;
+  --ref-rgb: 96, 165, 250;
+  --ref-bg: rgba(96, 165, 250, 0.1);
+  --neutral: #94a3b8;
+  --neutral-rgb: 148, 163, 184;
+
   /* componentes de cor usados em rgba(var(--x), alfa): no escuro, o branco
      e os tons de risco originais */
   --fx: 255, 255, 255;
@@ -111,21 +119,31 @@
   --accent-soft: rgba(20, 22, 26, 0.06);
   --accent-line: rgba(20, 22, 26, 0.55);
 
-  --crit: #b3303f;
-  --crit-bg: rgba(179, 48, 63, 0.09);
-  --warn: #85590a;
-  --warn-bg: rgba(133, 89, 10, 0.1);
-  --safe: #137536;
-  --safe-bg: rgba(23, 128, 61, 0.09);
+  /* paleta de status no claro — exatamente a paleta definida:
+     verde #22C55E (adequado), âmbar #F59E0B (atenção),
+     vermelho #EF4444 (crítico), azul #3B82F6 (referência),
+     cinza #64748B (neutro/auxiliar) */
+  --crit: #ef4444;
+  --crit-bg: rgba(239, 68, 68, 0.1);
+  --warn: #f59e0b;
+  --warn-bg: rgba(245, 158, 11, 0.12);
+  --safe: #22c55e;
+  --safe-bg: rgba(34, 197, 94, 0.1);
 
-  --g-crit: #f0707e;
-  --g-warn: #f5bd4f;
-  --g-safe: #45c97c;
+  --g-crit: #ef4444;
+  --g-warn: #f59e0b;
+  --g-safe: #22c55e;
+
+  --ref: #3b82f6;
+  --ref-rgb: 59, 130, 246;
+  --ref-bg: rgba(59, 130, 246, 0.1);
+  --neutral: #64748b;
+  --neutral-rgb: 100, 116, 139;
 
   --fx: 20, 22, 26;
   --ink-rgb: 20, 22, 26;
   --bg-rgb: 235, 233, 227;
-  --crit-rgb: 179, 48, 63;
+  --crit-rgb: 239, 68, 68;
   --glow-k: 0.35;
   --hatch-a: 0.24;
   --ink-ph: rgba(20, 22, 26, 0.6);
@@ -1058,4 +1076,11 @@ input {
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* foco visível para navegação por teclado em botões secundários */
+.btn--ghost:focus-visible {
+  outline: 2px solid var(--ref);
+  outline-offset: 2px;
+  color: var(--ink);
 }

@@ -1,346 +1,433 @@
 <template>
-  <!-- só o corpo: a moldura e o cabeçalho do módulo ficam no ResultsView -->
-  <div>
-  <div v-if="entries.length < 2" class="hist__empty">
-    Essa é a primeira avaliação registrada. Refaça o questionário depois de um tempo
-    pra começar a acompanhar a evolução aqui.
-  </div>
-
-  <div v-else class="hist">
-    <div class="hist__plot">
-      <!-- a linha é desenhada esticada; os pontos são HTML posicionado em %,
-           senão o preserveAspectRatio="none" achataria os círculos -->
-      <svg class="hist__line" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-        <polyline :points="linePoints" fill="none" stroke-width="0.6" vector-effect="non-scaling-stroke" />
-      </svg>
-
-      <span
-        v-for="(p, i) in points"
-        :key="i"
-        class="hist__pt"
-        :class="{ 'is-current': i === points.length - 1 }"
-        :style="{ left: p.x + '%', bottom: p.y + '%', '--c': p.color }"
-      >
-        <b>{{ p.value }}</b>
-        <em>{{ p.date }}</em>
-      </span>
+  <!-- só o corpo: moldura e cabeçalho ficam no ResultsView -->
+  <div class="hp">
+    <!-- resumo analítico -->
+    <div class="hp__stats">
+      <div class="hp__stat">
+        <span class="hp__k">Atual</span>
+        <span class="hp__v">{{ stats.current ? stats.current.overall : '—' }}<small v-if="stats.current">/100</small></span>
+        <span class="hp__s">{{ stats.current ? fmt(stats.current.date, true) : 'sem registro' }}</span>
+      </div>
+      <div class="hp__stat">
+        <span class="hp__k">Anterior</span>
+        <span class="hp__v">{{ stats.previous ? stats.previous.overall : '—' }}<small v-if="stats.previous">/100</small></span>
+        <span class="hp__s">{{ stats.previous ? fmt(stats.previous.date, true) : 'sem avaliação anterior' }}</span>
+      </div>
+      <div class="hp__stat">
+        <span class="hp__k">Variação</span>
+        <span class="hp__v" :class="signClass(stats.deltaPts)">{{ stats.deltaPts === null ? '—' : signed(stats.deltaPts) }}<small v-if="stats.deltaPts !== null">pts</small></span>
+        <span class="hp__s">{{ pctText(stats.deltaPct, stats.deltaPts) }}</span>
+      </div>
+      <div class="hp__stat">
+        <span class="hp__k">Avaliações</span>
+        <span class="hp__v">{{ stats.count }}</span>
+        <span class="hp__s">registradas</span>
+      </div>
     </div>
 
-    <div class="hist__delta" :class="delta >= 0 ? 'is-up' : 'is-down'">
-      <b>{{ deltaText }}</b>
-      <span>desde a 1ª</span>
+    <!-- estados vazios -->
+    <div v-if="!points.length" class="hp__empty">
+      Nenhuma avaliação registrada para esta empresa ainda.
     </div>
 
-    <!-- registro das últimas avaliações: data, responsável e nota -->
-    <ul class="hist__log" aria-label="Avaliações recentes">
-      <li
-        v-for="e in log"
-        :key="e.date"
-        class="hist__item"
-        :class="{ 'is-ref': e.date === compareDate, 'is-now': e.isCurrent }"
-      >
-        <span class="hist__when">{{ e.day }}</span>
-        <span class="hist__who" :class="{ 'is-empty': !e.responsavel }">{{ e.responsavel || 'não informado' }}</span>
-        <span class="hist__score">{{ e.overall }}/100</span>
-        <span class="hist__act">
-          <span v-if="e.isCurrent" class="hist__badge">Atual</span>
-          <span v-else-if="e.date === compareDate" class="hist__badge hist__badge--ref">Referência</span>
-          <button v-else type="button" class="hist__use" @click="$emit('compare', e.date)">Comparar</button>
-        </span>
-      </li>
-    </ul>
-  </div>
+    <template v-else>
+      <div class="hp__chartwrap">
+        <svg
+          class="hp__svg"
+          :viewBox="`0 0 ${W} ${H}`"
+          role="img"
+          :aria-label="ariaLabel"
+          @mouseleave="hover = null"
+        >
+          <!-- grade e eixo Y 0–100 -->
+          <g class="hp__grid">
+            <template v-for="v in [0, 25, 50, 75, 100]" :key="v">
+              <line :x1="PL" :x2="W - PR" :y1="y(v)" :y2="y(v)" :class="{ 'is-base': v === 0 }" />
+              <text :x="PL - 8" :y="y(v) + 3" text-anchor="end">{{ v }}</text>
+            </template>
+          </g>
 
-  <!-- backup do histórico: o localStorage vive só neste navegador -->
-  <div class="hist__io">
-    <button type="button" class="btn btn--ghost" @click="exportJson" :disabled="!entries.length">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M12 3v13m0 0-4.5-4.5M12 16l4.5-4.5M4 20h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      Exportar JSON
-    </button>
-    <button type="button" class="btn btn--ghost" @click="$refs.file.click()">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M12 16V3m0 0L7.5 7.5M12 3l4.5 4.5M4 20h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      Importar JSON
-    </button>
-    <input ref="file" type="file" accept="application/json,.json" hidden @change="importJson" />
-    <span v-if="status" class="hist__status" :class="`is-${status.kind}`" role="status">{{ status.text }}</span>
-  </div>
+          <!-- linha só quando há pelo menos 2 avaliações -->
+          <polyline v-if="points.length > 1" :points="linePoints" class="hp__line" />
+
+          <!-- eixo X: datas reais, com rótulos espaçados para não sobrepor -->
+          <g class="hp__xlab">
+            <template v-for="(p, i) in points" :key="'x' + p.id">
+              <text
+                v-if="i % step === 0 || i === points.length - 1"
+                :x="x(i)" :y="H - 8"
+                text-anchor="middle"
+              >{{ fmt(p.date) }}</text>
+            </template>
+          </g>
+
+          <!-- pontos -->
+          <g
+            v-for="(p, i) in points"
+            :key="p.id"
+            class="hp__pt"
+            :class="{ 'is-current': p.id === stats.current?.id, 'is-ref': p.id === referenceId, 'is-hover': hover === i }"
+            tabindex="0"
+            role="button"
+            :aria-label="pointLabel(p)"
+            @mouseenter="hover = i"
+            @focus="hover = i"
+            @blur="hover = null"
+            @click="choose(p)"
+            @keydown.enter.prevent="choose(p)"
+            @keydown.space.prevent="choose(p)"
+            @keydown.left.prevent="move(i, -1)"
+            @keydown.right.prevent="move(i, 1)"
+            @keydown.esc="hover = null"
+          >
+            <circle :cx="x(i)" :cy="y(p.overall)" r="14" class="hp__hit" />
+            <circle :cx="x(i)" :cy="y(p.overall)" :r="p.id === stats.current?.id ? 6 : 4.5" class="hp__dot" />
+            <circle v-if="p.id === referenceId" :cx="x(i)" :cy="y(p.overall)" r="9.5" class="hp__refring" />
+            <text
+              v-if="showValues"
+              :x="x(i)" :y="y(p.overall) - 13"
+              text-anchor="middle"
+              class="hp__val"
+            >{{ p.overall }}</text>
+          </g>
+        </svg>
+
+        <!-- tooltip -->
+        <div
+          v-if="hover !== null && points[hover]"
+          class="hp__tip"
+          :style="tipStyle"
+          role="tooltip"
+        >
+          <b>Avaliação #{{ points[hover].n }}<span v-if="points[hover].id === stats.current?.id"> · atual</span><span v-else-if="points[hover].id === referenceId"> · referência</span></b>
+          <span>{{ fmt(points[hover].date, true) }}</span>
+          <span>Pontuação: <strong>{{ points[hover].overall }}/100</strong></span>
+          <span v-if="points[hover].deltaPts !== null" :class="signClass(points[hover].deltaPts)">
+            {{ signed(points[hover].deltaPts) }} pontos vs anterior<template v-if="points[hover].deltaPct !== null"> ({{ signed(points[hover].deltaPct) }}%)</template>
+          </span>
+          <span v-else class="hp__muted">Primeira avaliação registrada</span>
+          <em v-if="points[hover].id !== stats.current?.id && points[hover].id !== referenceId">Clique para usar como referência</em>
+        </div>
+      </div>
+
+      <p v-if="points.length === 1" class="hp__note">
+        Só há uma avaliação registrada: ainda não existe evolução para comparar.
+      </p>
+      <p v-if="invalidDates" class="hp__note hp__note--warn">
+        {{ invalidDates }} registro(s) com data inválida ou ausente não aparecem no gráfico.
+      </p>
+
+      <!-- lista: mais recente primeiro -->
+      <ul class="hp__log" aria-label="Avaliações registradas">
+        <li
+          v-for="p in reversed"
+          :key="'l' + p.id"
+          class="hp__item"
+          :class="{ 'is-ref': p.id === referenceId, 'is-now': p.id === stats.current?.id }"
+        >
+          <span class="hp__n">#{{ p.n }}</span>
+          <span class="hp__when">{{ fmt(p.date, true) }}</span>
+          <span class="hp__who" :class="{ 'is-empty': !p.responsavel }">{{ p.responsavel || 'não informado' }}</span>
+          <span class="hp__score">{{ p.overall }}/100</span>
+          <span class="hp__d" :class="signClass(p.deltaPts)">{{ p.deltaPts === null ? '—' : signed(p.deltaPts) + ' pts' }}</span>
+          <span class="hp__act">
+            <span v-if="p.id === stats.current?.id" class="hp__badge">Atual</span>
+            <span v-else-if="p.id === referenceId" class="hp__badge hp__badge--ref">Referência</span>
+            <button v-else type="button" class="hp__use" @click="choose(p)">Comparar</button>
+          </span>
+        </li>
+      </ul>
+    </template>
   </div>
 </template>
 
 <script>
-import { getTier } from '../utils/scoring.js'
-import { buildHistoryExport, importHistory } from '../utils/storage.js'
+import { prepareHistory, historyStats, formatDate, labelStep } from '../utils/history.js'
 
 export default {
   name: 'HistoryPanel',
   props: {
-    entries: {
-      type: Array,
-      required: true
-    },
-    companyName: {
-      type: String,
-      default: ''
-    },
-    compareDate: {
-      type: String,
-      default: ''
-    },
-    questionCount: {
-      type: Number,
-      default: 20
-    }
+    entries: { type: Array, required: true },
+    currentId: { type: String, default: '' },
+    referenceId: { type: String, default: '' }
   },
-  emits: ['compare', 'updated'],
+  emits: ['select-reference'],
   data() {
-    return { status: null }
+    return { hover: null, compact: false, mq: null, H: 230, PL: 40, PR: 24, PT: 24, PB: 34 }
+  },
+  mounted() {
+    try {
+      this.mq = window.matchMedia('(max-width: 700px)')
+      this.compact = this.mq.matches
+      this.mq.addEventListener('change', this.onMq)
+    } catch { /* sem matchMedia */ }
+  },
+  beforeUnmount() {
+    if (this.mq) this.mq.removeEventListener('change', this.onMq)
   },
   computed: {
-    recentEntries() {
-      return this.entries.slice(-5)
-    },
-    // escala vertical: 0–100 deixaria a linha praticamente reta em variações
-    // pequenas, então o eixo se ajusta ao intervalo dos dados com folga —
-    // e cada ponto carrega o número, para a inclinação nunca ser lida sozinha
-    bounds() {
-      const values = this.recentEntries.map(e => e.overall)
-      const min = Math.min(...values)
-      const max = Math.max(...values)
-      const pad = Math.max(6, (max - min) * 0.35)
-      const lo = Math.max(0, Math.round(min - pad))
-      const hi = Math.min(100, Math.round(max + pad))
-      return hi === lo ? { lo: Math.max(0, lo - 5), hi: Math.min(100, hi + 5) } : { lo, hi }
-    },
-    points() {
-      const list = this.recentEntries
-      const { lo, hi } = this.bounds
-      return list.map((entry, i) => ({
-        // margem lateral para o rótulo do primeiro e do último não vazarem
-        x: list.length === 1 ? 50 : 8 + (i / (list.length - 1)) * 84,
-        y: 16 + ((entry.overall - lo) / (hi - lo)) * 62,
-        value: entry.overall,
-        date: this.formatDate(entry.date),
-        color: `var(--${getTier(entry.overall).tone})`
-      }))
-    },
-    // mais recente primeiro
-    log() {
-      const last = this.entries[this.entries.length - 1]
-      // a referência escolhida sempre aparece no registro, mesmo que seja antiga
-      const list = this.recentEntries.slice()
-      const ref = this.entries.find(e => e.date === this.compareDate)
-      if (ref && !list.includes(ref)) list.unshift(ref)
-      return list
-        .map(e => ({
-          isCurrent: e === last,
-          date: e.date,
-          overall: e.overall,
-          responsavel: e.responsavel,
-          day: new Date(e.date).toLocaleDateString('pt-BR')
-        }))
-        .reverse()
-    },
-    linePoints() {
-      return this.points.map(p => `${p.x},${100 - p.y}`).join(' ')
-    },
-    delta() {
-      if (this.entries.length < 2) return 0
-      return this.entries[this.entries.length - 1].overall - this.entries[0].overall
-    },
-    deltaText() {
-      return (this.delta > 0 ? '+' : '') + this.delta
-    }
-  },
-  methods: {
-    exportJson() {
-      const data = buildHistoryExport(this.companyName)
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-      const slug = (this.companyName || 'empresa')
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)/g, '')
-      const a = document.createElement('a')
-      a.href = URL.createObjectURL(blob)
-      a.download = `historico-${slug || 'empresa'}.json`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      setTimeout(() => URL.revokeObjectURL(a.href), 1000)
-      this.status = { kind: 'ok', text: `${data.entries.length} avaliações exportadas` }
-    },
-    async importJson(ev) {
-      const file = ev.target.files && ev.target.files[0]
-      ev.target.value = ''
-      if (!file) return
-      try {
-        if (file.size > 2 * 1024 * 1024) throw new Error('Arquivo grande demais (máx. 2 MB).')
-        const data = JSON.parse(await file.text())
-        const r = importHistory(data, this.companyName, this.questionCount)
-        this.$emit('updated', r.history)
-        const extra = []
-        if (r.skipped) extra.push(`${r.skipped} já existiam`)
-        if (r.invalid) extra.push(`${r.invalid} inválidas`)
-        this.status = {
-          kind: r.added ? 'ok' : 'warn',
-          text: `${r.added} importadas` + (extra.length ? ` · ${extra.join(' · ')}` : '')
-        }
-      } catch (err) {
-        this.status = {
-          kind: 'err',
-          text: err instanceof SyntaxError ? 'O arquivo não é um JSON válido.' : err.message
-        }
+    // no celular o viewBox fica estreito: textos continuam legíveis
+    W() { return this.compact ? 380 : 720 },
+    prepared() { return prepareHistory(this.entries) },
+    points() { return this.prepared.points },
+    invalidDates() { return this.prepared.invalidDates },
+    stats() { return historyStats(this.points, this.currentId) },
+    reversed() { return this.points.slice().reverse() },
+    step() { return labelStep(this.points.length, this.compact ? 4 : 8) },
+    showValues() { return this.points.length <= (this.compact ? 6 : 12) },
+    linePoints() { return this.points.map((p, i) => `${this.x(i)},${this.y(p.overall)}`).join(' ') },
+    tipStyle() {
+      const p = this.points[this.hover]
+      const left = (this.x(this.hover) / this.W) * 100
+      const top = (this.y(p.overall) / this.H) * 100
+      return {
+        left: `clamp(8px, ${left}%, calc(100% - 228px))`,
+        top: top + '%',
+        transform: top < 40 ? 'translate(-10px, 22px)' : 'translate(-10px, calc(-100% - 18px))'
       }
     },
-    formatDate(iso) {
-      return new Date(iso).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }).toUpperCase()
+    ariaLabel() {
+      if (!this.points.length) return 'Histórico vazio'
+      const list = this.points.map(p => `${formatDate(p.date)}: ${p.overall}`).join('; ')
+      return `Evolução da pontuação geral, de 0 a 100, em ordem cronológica. ${list}`
+    }
+  },
+  watch: {
+    entries() { this.hover = null }
+  },
+  methods: {
+    onMq(e) { this.compact = e.matches },
+    fmt(iso, t) { return formatDate(iso, t) },
+    // ordinal: avaliações do mesmo dia ficam lado a lado, nenhuma é escondida
+    x(i) {
+      const n = this.points.length
+      const w = this.W - this.PL - this.PR
+      return n <= 1 ? this.PL + w / 2 : this.PL + 14 + (i / (n - 1)) * (w - 28)
+    },
+    y(v) {
+      return this.PT + (1 - v / 100) * (this.H - this.PT - this.PB)
+    },
+    signed(n) { return n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : '±0' },
+    signClass(n) { return n === null || n === undefined ? '' : n > 0 ? 'is-up' : n < 0 ? 'is-down' : 'is-flat' },
+    pctText(pct, pts) {
+      if (pts === null) return 'sem comparação'
+      if (pct === null) return 'percentual indisponível (base 0)'
+      return `${this.signed(pct)}% relativo`
+    },
+    pointLabel(p) {
+      let s = `Avaliação ${p.n}, ${formatDate(p.date, true)}, ${p.overall} de 100`
+      if (p.deltaPts !== null) s += `, ${this.signed(p.deltaPts)} pontos em relação à anterior`
+      if (p.id === this.stats.current?.id) s += ', avaliação atual'
+      else if (p.id === this.referenceId) s += ', referência selecionada'
+      return s
+    },
+    choose(p) {
+      if (p.id !== this.stats.current?.id) this.$emit('select-reference', p.id)
+    },
+    move(i, d) {
+      const next = Math.max(0, Math.min(this.points.length - 1, i + d))
+      const nodes = this.$el.querySelectorAll('.hp__pt')
+      if (nodes[next]) nodes[next].focus()
     }
   }
 }
 </script>
 
 <style scoped>
-.hist__empty {
-  padding: 20px 18px;
-  font-size: 13px;
-  color: var(--ink-lo);
-  line-height: 1.65;
-}
-
-.hist {
+.hp__stats {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 116px;
-  gap: 20px;
-  align-items: center;
-  padding: 22px 18px 18px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-top: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
 }
 
-.hist__plot {
-  position: relative;
-  height: 108px;
-}
-
-.hist__line polyline {
-  stroke: rgba(var(--fx), 0.32);
-}
-
-.hist__line {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.hist__pt {
-  position: absolute;
-  transform: translate(-50%, 50%);
+.hp__stat {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  opacity: 0.6;
+  gap: 3px;
+  padding: 14px 16px;
+  border-right: 1px solid var(--line-soft);
+  min-width: 0;
 }
 
-.hist__pt::before {
-  content: '';
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  border: 1.5px solid var(--c);
-  order: 2;
-}
+.hp__stat:last-child { border-right: none; }
 
-.hist__pt.is-current {
-  opacity: 1;
-}
-
-.hist__pt.is-current::before {
-  background: var(--c);
-}
-
-.hist__pt b {
-  order: 1;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  color: var(--ink);
-  line-height: 1.2;
-}
-
-.hist__pt em {
-  order: 3;
-  font-style: normal;
+.hp__k {
   font-size: 9px;
-  letter-spacing: 0.12em;
-  color: var(--ink-faint);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-lo);
+}
+
+.hp__v {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.05em;
+  color: var(--ink);
+  line-height: 1.15;
+}
+
+.hp__v small {
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  color: var(--ink-lo);
+  margin-left: 3px;
+}
+
+.hp__s {
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  color: var(--ink-lo);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* ocupa a linha de baixo da grade, sem competir com o gráfico */
-.hist__log {
-  grid-column: 1 / -1;
-  list-style: none;
-  border-top: 1px solid var(--line-soft);
-  margin-top: 4px;
+.is-up { color: var(--safe) !important; }
+.is-down { color: var(--crit) !important; }
+.is-flat { color: var(--ink-lo) !important; }
+
+.hp__empty,
+.hp__note {
+  margin: 0;
+  padding: 14px 18px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink-lo);
 }
 
-.hist__item {
+.hp__note--warn { color: var(--warn); }
+
+.hp__chartwrap {
+  position: relative;
+  padding: 10px 10px 0;
+}
+
+.hp__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  font-family: 'Azeret Mono', ui-monospace, monospace;
+}
+
+.hp__grid line {
+  stroke: var(--line-soft);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+
+.hp__grid line.is-base { stroke: var(--line-strong); stroke-dasharray: none; }
+
+.hp__grid text,
+.hp__xlab text {
+  font-size: 10px;
+  fill: var(--ink-lo);
+}
+
+.hp__line {
+  fill: none;
+  stroke: var(--ink-mid);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.hp__pt { cursor: pointer; outline: none; }
+.hp__hit { fill: transparent; }
+
+.hp__dot {
+  fill: var(--panel-deep);
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+
+.hp__pt.is-current .hp__dot { fill: var(--ink); }
+
+.hp__refring {
+  fill: none;
+  stroke: var(--ref);
+  stroke-width: 2;
+  stroke-dasharray: 3 2;
+}
+
+.hp__pt.is-hover .hp__dot,
+.hp__pt:focus-visible .hp__dot { stroke-width: 3; }
+
+.hp__pt:focus-visible .hp__hit {
+  stroke: var(--ink);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 2;
+}
+
+.hp__val {
+  font-size: 11px;
+  font-weight: 600;
+  fill: var(--ink);
+  paint-order: stroke;
+  stroke: var(--panel-deep);
+  stroke-width: 3px;
+}
+
+.hp__tip {
+  position: absolute;
+  z-index: 3;
+  width: 220px;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 14px;
-  align-items: baseline;
-  padding: 8px 0;
+  gap: 3px;
+  padding: 10px 12px;
+  background: var(--panel-deep);
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-mid);
+  pointer-events: none;
+}
+
+.hp__tip b {
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.hp__tip strong { color: var(--ink); }
+.hp__tip em { font-style: normal; color: var(--ref); }
+.hp__muted { color: var(--ink-lo); }
+
+.hp__log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 290px;
+  overflow-y: auto;
+  border-top: 1px solid var(--line-soft);
+}
+
+.hp__item {
+  display: grid;
+  grid-template-columns: 36px 128px minmax(0, 1fr) 64px 70px 96px;
+  gap: 12px;
+  align-items: center;
+  padding: 9px 18px;
   border-bottom: 1px solid var(--line-soft);
   font-size: 11px;
   letter-spacing: 0.04em;
 }
 
-.hist__item:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
-}
+.hp__item.is-ref { box-shadow: inset 3px 0 0 var(--ref); }
+.hp__item.is-now { box-shadow: inset 3px 0 0 var(--ink); }
 
-.hist__when {
-  color: var(--ink-lo);
-  font-variant-numeric: tabular-nums;
-}
+.hp__n { color: var(--ink-faint); }
+.hp__when { color: var(--ink-lo); font-variant-numeric: tabular-nums; }
+.hp__who { color: var(--ink-mid); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hp__who.is-empty { color: var(--ink-lo); font-style: italic; }
+.hp__score { color: var(--ink); font-weight: 600; text-align: right; }
+.hp__d { text-align: right; color: var(--ink-lo); }
+.hp__act { text-align: right; }
 
-.hist__who {
-  color: var(--ink-mid);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.hist__who.is-empty {
-  color: var(--ink-lo);
-  font-style: italic;
-}
-
-.hist__score {
-  color: var(--ink);
-  font-weight: 500;
-}
-
-.hist__delta {
-  text-align: right;
-}
-
-.hist__item {
-  grid-template-columns: auto minmax(0, 1fr) auto 96px !important;
-}
-
-.hist__item.is-ref .hist__when,
-.hist__item.is-ref .hist__score { color: var(--crit); }
-
-.hist__act { text-align: right; }
-
-.hist__badge {
+.hp__badge {
   font-size: 9px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -349,12 +436,9 @@ export default {
   padding: 2px 6px;
 }
 
-.hist__badge--ref {
-  color: var(--crit);
-  border-color: var(--crit);
-}
+.hp__badge--ref { color: var(--ref); border-color: var(--ref); }
 
-.hist__use {
+.hp__use {
   font: inherit;
   font-size: 9px;
   letter-spacing: 0.16em;
@@ -362,72 +446,28 @@ export default {
   color: var(--ink-lo);
   background: none;
   border: 1px dashed var(--line);
-  padding: 2px 6px;
+  padding: 3px 7px;
   cursor: pointer;
-  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
 
-.hist__use:hover,
-.hist__use:focus-visible {
-  color: var(--crit);
-  border-color: var(--crit);
+.hp__use:hover,
+.hp__use:focus-visible {
+  color: var(--ref);
+  border-color: var(--ref);
+  outline: none;
 }
 
-.hist__io {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 10px;
-  border-top: 1px solid var(--line);
-  background: rgba(var(--fx), 0.015);
-}
-
-.hist__status {
-  margin-left: auto;
-  padding-right: 8px;
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.hist__status.is-ok { color: var(--safe); }
-.hist__status.is-warn { color: var(--warn); }
-.hist__status.is-err { color: var(--crit); }
-
-.hist__delta b {
-  display: block;
-  font-size: 26px;
-  font-weight: 600;
-  letter-spacing: -0.05em;
-  line-height: 1.1;
-}
-
-.hist__delta.is-up b { color: var(--safe); }
-.hist__delta.is-down b { color: var(--crit); }
-
-.hist__delta span {
-  font-size: 9.5px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--ink-lo);
-}
-
-@media (max-width: 560px) {
-  .hist {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 14px;
+@media (max-width: 700px) {
+  .hp__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hp__stat:nth-child(2) { border-right: none; }
+  .hp__stat:nth-child(-n + 2) { border-bottom: 1px solid var(--line-soft); }
+  .hp__item {
+    grid-template-columns: 30px minmax(0, 1fr) auto;
+    gap: 4px 10px;
+    padding: 10px 14px;
   }
-
-  .hist__delta {
-    text-align: left;
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-  }
-
-  .hist__pt em {
-    display: none;
-  }
+  .hp__who, .hp__d { display: none; }
+  .hp__act { grid-column: 2 / -1; text-align: left; }
+  .hp__tip { width: 200px; }
 }
 </style>

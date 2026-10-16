@@ -50,9 +50,10 @@
             :theme-scores="themeScores"
             :overall="overall"
             :history="history"
+            :current-id="currentId"
+            @history-updated="history = $event"
             :questions="questions"
             :answers="answers"
-            @history-updated="history = $event"
             @restart="restart"
             @home="goHome"
           />
@@ -87,6 +88,8 @@ export default {
       current: 0,
       answers: new Array(questions.length).fill(null),
       history: [],
+      // id da avaliação feita nesta sessão (a "atual" no histórico)
+      currentId: '',
       themeScores: {},
       overall: 0,
       // sentido da última navegação: define de que lado o próximo card entra
@@ -145,7 +148,7 @@ export default {
     calculate() {
       this.themeScores = computeThemeScores(this.questions, this.answers)
       this.overall = computeOverallScore(this.themeScores)
-      this.history = saveAssessment({
+      const saved = saveAssessment({
         date: new Date().toISOString(),
         overall: this.overall,
         themeScores: this.themeScores,
@@ -154,6 +157,8 @@ export default {
         companyName: this.companyName,
         responsavel: this.responsavel
       })
+      this.currentId = saved.id
+      this.history = saved.history
       this.view = 'results'
     },
     restart() {

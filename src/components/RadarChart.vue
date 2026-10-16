@@ -2,6 +2,7 @@
   <div class="rdr" :class="{ 'has-active': active !== null, 'is-compact': compact }">
     <!-- ================= GRÁFICO ================= -->
     <div class="rdr__stage">
+      <div class="rdr__plot">
       <svg
         class="rdr__svg"
         :viewBox="`0 0 ${W} ${H}`"
@@ -34,7 +35,7 @@
           <path :d="`M ${W - 26} ${H - 8} H ${W - 8} V ${H - 26}`" />
           <text x="16" y="24" class="rdr__hudtxt">SCAN // 4 EIXOS</text>
           <text :x="W - 16" y="24" text-anchor="end" class="rdr__hudtxt">
-            REF ▸ <tspan :class="previous ? 'rdr__hud--prev' : ''">{{ previous ? previousDate || 'ANTERIOR' : '—' }}</tspan>
+            REF ▸ <tspan :class="previous ? 'rdr__hud--prev' : ''">{{ previous ? previousDate || 'ANTERIOR' : 'SEM REFERÊNCIA' }}</tspan>
           </text>
           <text x="16" :y="H - 16" class="rdr__hudtxt">ÁREA {{ coverage }}%</text>
           <text :x="W - 16" :y="H - 16" text-anchor="end" class="rdr__hudtxt">ESCALA 0–100</text>
@@ -103,7 +104,7 @@
         </g>
 
         <!-- avaliação atual -->
-        <polygon :points="poly(shown)" class="rdr__area--cur" :fill="`url(#${uid('fill')})`" :filter="`url(#${uid('glow')})`" />
+        <polygon :points="poly(shown)" class="rdr__area--cur" :filter="`url(#${uid('glow')})`" />
 
         <!-- vetores de mudança: da posição anterior até a atual -->
         <g v-if="previous && settled" class="rdr__vectors">
@@ -173,13 +174,40 @@
             :d="hitPath(i)"
             tabindex="0"
             role="button"
-            :aria-label="`${t}: ${scores[t]} pontos`"
+            :aria-label="`${t}: ${scores[t]} de 100, peso ${weight(t)}${previous ? `, referência ${previous[t]}` : ', sem referência'}. Use as setas para trocar de eixo.`"
             @mouseenter="active = i"
             @focus="active = i"
             @blur="active = null"
+            @keydown.right.prevent="focusAxis(i + 1)"
+            @keydown.down.prevent="focusAxis(i + 1)"
+            @keydown.left.prevent="focusAxis(i - 1)"
+            @keydown.up.prevent="focusAxis(i - 1)"
+            @keydown.esc="$event.target.blur()"
           />
         </g>
       </svg>
+
+      <!-- tooltip do eixo em foco (mouse ou teclado) -->
+      <div
+        v-if="active !== null"
+        class="rdr__tip"
+        :class="`rdr__tip--${tipSide}`"
+        :style="tipStyle"
+        role="tooltip"
+      >
+        <div class="rdr__tiph">
+          <b>{{ themes[active] }}</b>
+          <span class="tag" :class="`tag--${tone(scores[themes[active]])}`"><i></i>{{ tierLabel(scores[themes[active]]) }}</span>
+        </div>
+        <div class="readout"><span class="readout__k">Atual</span><span class="readout__dots"></span><span class="readout__v">{{ scores[themes[active]] }}/100</span></div>
+        <div class="readout"><span class="readout__k">Peso</span><span class="readout__dots"></span><span class="readout__v">{{ weight(themes[active]) }}</span></div>
+        <template v-if="previous">
+          <div class="readout"><span class="readout__k">Ref. {{ previousDate }}</span><span class="readout__dots"></span><span class="readout__v rdr__refv">{{ previous[themes[active]] }}/100</span></div>
+          <div class="readout"><span class="readout__k">Variação</span><span class="readout__dots"></span><span class="readout__v" :class="deltaClass(themes[active])">{{ signed(delta(themes[active])) }} pts</span></div>
+        </template>
+        <div v-else class="readout"><span class="readout__k">Referência</span><span class="readout__dots"></span><span class="readout__v">Sem referência</span></div>
+      </div>
+      </div>
     </div>
 
     <!-- ================= PAINEL DE LEITURA ================= -->
@@ -240,9 +268,12 @@
       </p>
 
       <div class="rdr__legend">
-        <span><i class="rdr__sw rdr__sw--cur"></i>Atual</span>
-        <span v-if="previous"><i class="rdr__sw rdr__sw--prev"></i>Referência</span>
-        <span><i class="rdr__cellkey rdr__cell--safe"></i><i class="rdr__cellkey rdr__cell--warn"></i><i class="rdr__cellkey rdr__cell--crit"></i>Respostas</span>
+        <span><i class="rdr__sw rdr__sw--cur"></i>Atual (linha contínua)</span>
+        <span v-if="previous"><i class="rdr__sw rdr__sw--prev"></i>Referência {{ previousDate }} (tracejada)</span>
+        <span v-else class="rdr__nolegend">Sem referência</span>
+        <span><i class="rdr__lk rdr__lk--safe"></i>Baixo ≥70</span>
+        <span><i class="rdr__lk rdr__lk--warn"></i>Moderado 40–69</span>
+        <span><i class="rdr__lk rdr__lk--crit"></i>Crítico &lt;40</span>
       </div>
     </div>
   </div>
@@ -336,6 +367,17 @@ export default {
       }
       return list
     },
+    tipSide() {
+      if (this.active === null) return 'r'
+      const c = Math.cos(this.angle(this.active))
+      return c < -0.3 ? 'r' : c > 0.3 ? 'l' : 'r'
+    },
+    // ancorado no vértice atual do eixo, em % do viewBox (escala com o SVG)
+    tipStyle() {
+      const t = this.themes[this.active]
+      const p = this.pt(this.active, this.scores[t])
+      return { left: (p.x / this.W) * 100 + '%', top: (p.y / this.H) * 100 + '%' }
+    },
     ariaLabel() {
       const now = this.themes.map(t => `${t} ${this.scores[t]}`).join(', ')
       if (!this.previous) return `Radar por tema: ${now}`
@@ -362,9 +404,16 @@ export default {
   },
   methods: {
     onMq(e) { this.compact = e.matches },
+    focusAxis(i) {
+      const n = this.themes.length
+      const nodes = this.$el.querySelectorAll('.rdr__hits path')
+      const el = nodes[(i + n) % n]
+      if (el) el.focus()
+    },
     uid(name) { return `${this.id}-${name}` },
     weight(t) { return `${Math.round(THEME_WEIGHTS[t] * 100)}%` },
     tone(score) { return getTier(score).tone },
+    tierLabel(score) { return getTier(score).label },
     delta(t) { return this.previous ? (this.scores[t] ?? 0) - (this.previous[t] ?? 0) : 0 },
     signed(n) { return n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : '±0' },
     signClass(n) { return n > 0 ? 'is-up' : n < 0 ? 'is-down' : 'is-flat' },
@@ -532,7 +581,7 @@ export default {
   fill: var(--ink-lo);
 }
 
-.rdr__hud--prev { fill: var(--crit); }
+.rdr__hud--prev { fill: var(--ref); }
 
 .rdr__ring {
   fill: none;
@@ -615,8 +664,8 @@ export default {
 .rdr__axisg.is-active .rdr__axis { stroke: var(--ink-mid); }
 
 .rdr__area--prev {
-  fill: rgba(var(--crit-rgb), 0.1);
-  stroke: var(--crit);
+  fill: rgba(var(--ref-rgb), 0.08);
+  stroke: var(--ref);
   stroke-width: 1.6;
   stroke-dasharray: 6 4;
   stroke-linejoin: round;
@@ -624,11 +673,12 @@ export default {
 
 .rdr__pdot {
   fill: var(--bg);
-  stroke: var(--crit);
+  stroke: var(--ref);
   stroke-width: 1.6;
 }
 
 .rdr__area--cur {
+  fill: rgba(var(--ink-rgb), 0.1);
   stroke: var(--ink);
   stroke-width: 2.2;
   stroke-linejoin: round;
@@ -702,6 +752,14 @@ export default {
   fill: transparent;
   outline: none;
   cursor: crosshair;
+}
+
+/* foco por teclado: a fatia do eixo ganha contorno visível */
+.rdr__hits path:focus-visible {
+  fill: rgba(var(--ref-rgb), 0.06);
+  stroke: var(--ref);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
 }
 
 /* ---------- painel ---------- */
@@ -845,7 +903,7 @@ export default {
   width: 2px;
   height: 12px;
   margin-left: -1px;
-  background: var(--crit);
+  background: var(--ref);
   box-shadow: 0 0 0 1px var(--bg);
 }
 
@@ -910,7 +968,56 @@ export default {
   border-top: 2px solid var(--ink);
 }
 
-.rdr__sw--prev { border-top: 2px dashed var(--crit); }
+.rdr__sw--prev { border-top: 2px dashed var(--ref); }
+
+.rdr__nolegend { color: var(--ink-lo); font-style: italic; text-transform: none; letter-spacing: 0.04em; }
+
+/* chave das faixas: mesma forma das etiquetas (cor + glifo) */
+.rdr__lk { width: 7px; height: 7px; display: inline-block; }
+.rdr__lk--crit { background: var(--g-crit); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.rdr__lk--warn { background: var(--g-warn); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.rdr__lk--safe { background: var(--g-safe); border-radius: 50%; }
+
+
+
+/* ---------- tooltip ---------- */
+.rdr__plot { position: relative; }
+
+.rdr__tip {
+  position: absolute;
+  z-index: 3;
+  width: 210px;
+  padding: 10px 12px 8px;
+  background: var(--panel-deep);
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+  display: grid;
+  gap: 4px;
+}
+
+.rdr__tip--r { transform: translate(14px, -50%); }
+.rdr__tip--l { transform: translate(calc(-100% - 14px), -50%); }
+
+.rdr__tiph {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.rdr__tip .readout { font-size: 9.5px; }
+.rdr__refv { color: var(--ref) !important; }
+
+@media (max-width: 560px) {
+  .rdr__tip { width: 180px; }
+  .rdr__tip--r, .rdr__tip--l { left: 50% !important; transform: translate(-50%, 18px); }
+}
 
 .rdr__cellkey {
   display: inline-block;
@@ -942,4 +1049,25 @@ export default {
   .rdr__sv { font-size: 20px; }
   .rdr__item { grid-template-columns: minmax(0, 1fr) 70px 48px; gap: 10px; padding: 11px 14px; }
 }
+</style>
+
+<style>
+/* regras do tema claro fora do scoped: o seletor do tema fica no <html> */
+/* no claro: sem brilho, grade e faixas no cinza neutro (#64748B) e área
+   atual translúcida, para não esconder a grade nem a referência */
+:root[data-theme='light'] .rdr .rdr__area--cur {
+  filter: none;
+  fill: rgba(var(--neutral-rgb), 0.12);
+  stroke: #0f172a;
+}
+:root[data-theme='light'] .rdr .rdr__band--crit { fill: rgba(var(--neutral-rgb), 0.1); }
+:root[data-theme='light'] .rdr .rdr__band--warn { fill: rgba(var(--neutral-rgb), 0.06); }
+:root[data-theme='light'] .rdr .rdr__band--safe { fill: rgba(var(--neutral-rgb), 0.03); }
+:root[data-theme='light'] .rdr .rdr__grid,
+:root[data-theme='light'] .rdr .rdr__axis,
+:root[data-theme='light'] .rdr .rdr__ring { stroke: rgba(var(--neutral-rgb), 0.35); }
+:root[data-theme='light'] .rdr .rdr__bandtxt text,
+:root[data-theme='light'] .rdr .rdr__scale text,
+:root[data-theme='light'] .rdr .rdr__lmeta,
+:root[data-theme='light'] .rdr .rdr__hudtxt { fill: var(--neutral); }
 </style>

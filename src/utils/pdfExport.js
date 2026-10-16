@@ -8,6 +8,8 @@
 
 import { jsPDF, GState } from 'jspdf'
 import { THEME_WEIGHTS, getTier } from './scoring.js'
+import { exportFileName } from './storage.js'
+import { prepareHistory, historyStats, formatDate, labelStep } from './history.js'
 import { AZERET_MONO_REGULAR_BASE64 } from './fonts/azeretMonoRegular.js'
 import { AZERET_MONO_SEMIBOLD_BASE64 } from './fonts/azeretMonoSemiBold.js'
 
@@ -25,6 +27,7 @@ const INK_LO = [134, 134, 132] // ~--ink-lo sobre --bg
 const CRIT = [226, 112, 122]
 const WARN = [229, 187, 99]
 const SAFE = [79, 221, 118]
+const REF = [59, 130, 246] // azul de referência (#3B82F6)
 const TONE_COLOR = { crit: CRIT, warn: WARN, safe: SAFE }
 const TONE_LABEL = { crit: 'Crítico', warn: 'Importante', safe: 'Recomendado' }
 
@@ -144,10 +147,10 @@ function drawRadar(doc, cx, cy, R, themeScores, previousScores) {
   if (previousScores) {
     const prev = themes.map((t, i) => pt(i, previousScores[t]))
     withOpacity(doc, 0.12, () => {
-      doc.setFillColor(...CRIT)
+      doc.setFillColor(...REF)
       polygon(doc, prev, 'F')
     })
-    doc.setDrawColor(...CRIT)
+    doc.setDrawColor(...REF)
     doc.setLineWidth(1)
     doc.setLineDashPattern([4, 3], 0)
     polygon(doc, prev, 'S')
@@ -196,7 +199,10 @@ export function exportResultsPdf({
   actionPlan,
   previousScores = null,
   previousDate = '',
-  previousOverall = null
+  previousOverall = null,
+  history = [],
+  currentId = '',
+  referenceId = ''
 }) {
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
   registerFont(doc)
@@ -324,7 +330,7 @@ export function exportResultsPdf({
       const prev = previousScores[theme] ?? 0
       const d = cur - prev
       doc.setFont(FONT, 'normal')
-      doc.setTextColor(...CRIT)
+      doc.setTextColor(...REF)
       doc.text(String(prev), tx + tw * 0.78, ty, { align: 'right' })
       doc.setFont(FONT, 'bold')
       doc.setTextColor(...(d > 0 ? SAFE : d < 0 ? CRIT : INK_LO))
@@ -348,7 +354,7 @@ export function exportResultsPdf({
   doc.text('ATUAL', tx + 20, ty, { charSpace: 0.4 })
   if (previousScores) {
     doc.setLineWidth(1)
-    doc.setDrawColor(...CRIT)
+    doc.setDrawColor(...REF)
     doc.setLineDashPattern([3, 2], 0)
     doc.line(tx + 70, ty - 3, tx + 84, ty - 3)
     doc.setLineDashPattern([], 0)
@@ -445,12 +451,202 @@ export function exportResultsPdf({
     y += 20
   })
 
-  const slug = (companyName || 'empresa')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '')
+  // Histórico: sempre começa numa página nova, para o gráfico não ser cortado
+  drawHistorySection(doc, { history, currentId, referenceId, previousDate, marginX, contentWidth, pageWidth })
 
-  doc.save(`diagnostico-${slug || 'empresa'}.pdf`)
+  // rodapé com numeração em todas as páginas
+  const total = doc.internal.getNumberOfPages()
+  for (let i = 1; i <= total; i += 1) {
+    doc.setPage(i)
+    doc.setFont(FONT, 'normal')
+    doc.setFontSize(7.5)
+    doc.setTextColor(...INK_LO)
+    doc.text(`SEGURA. · ${companyName || 'Empresa'} · ${issuedAt}`, marginX, 820, { charSpace: 0.3 })
+    doc.text(`${i}/${total}`, pageWidth - marginX, 820, { align: 'right' })
+  }
+
+  doc.save(exportFileName(companyName) + '.pdf')
+}
+
+function drawHistorySection(doc, { history, currentId, referenceId, previousDate, marginX, contentWidth, pageWidth }) {
+  const { points, invalidDates } = prepareHistory(history)
+  const stats = historyStats(points, currentId)
+  let y = newPage(doc)
+
+  sectionHead(doc, '04', 'Histórico de avaliações', marginX, y, contentWidth)
+  y += 26
+
+  // identificação da avaliação atual e da referência
+  doc.setFont(FONT, 'normal')
+  doc.setFontSize(8.5)
+  doc.setTextColor(...INK_MID)
+  const cur = stats.current
+  const ref = points.find(p => p.id === referenceId)
+  doc.text(`AVALIAÇÃO ATUAL: ${cur ? `#${cur.n} · ${formatDate(cur.date, true)} · ${cur.overall}/100` : '—'}`, marginX, y, { charSpace: 0.3 })
+  y += 14
+  doc.setTextColor(...REF)
+  doc.text(`REFERÊNCIA: ${ref ? `#${ref.n} · ${formatDate(ref.date, true)} · ${ref.overall}/100` : 'sem referência'}`, marginX, y, { charSpace: 0.3 })
+  y += 22
+
+  // indicadores
+  const cells = [
+    ['ATUAL', cur ? `${cur.overall}/100` : '—'],
+    ['ANTERIOR', stats.previous ? `${stats.previous.overall}/100` : '—'],
+    ['VARIAÇÃO', stats.deltaPts === null ? '—' : `${signed(stats.deltaPts)} pts`],
+    ['AVALIAÇÕES', String(stats.count)]
+  ]
+  const cw = contentWidth / 4
+  doc.setDrawColor(...LINE)
+  doc.rect(marginX, y, contentWidth, 46)
+  cells.forEach(([k, v], i) => {
+    const cx = marginX + cw * i
+    if (i) doc.line(cx, y, cx, y + 46)
+    doc.setFont(FONT, 'normal')
+    doc.setFontSize(7)
+    doc.setTextColor(...INK_LO)
+    doc.text(k, cx + 10, y + 15, { charSpace: 0.5 })
+    doc.setFont(FONT, 'bold')
+    doc.setFontSize(14)
+    const col = i === 2 && stats.deltaPts !== null ? (stats.deltaPts > 0 ? SAFE : stats.deltaPts < 0 ? CRIT : INK_LO) : INK
+    doc.setTextColor(...col)
+    doc.text(v, cx + 10, y + 36)
+  })
+  y += 64
+
+  if (stats.deltaPct !== null) {
+    doc.setFont(FONT, 'normal')
+    doc.setFontSize(7.5)
+    doc.setTextColor(...INK_LO)
+    doc.text(`Variação relativa: ${signed(stats.deltaPct)}% (pontos e porcentagem são métricas diferentes).`, marginX, y)
+    y += 18
+  }
+
+  if (points.length < 2) {
+    doc.setFont(FONT, 'normal')
+    doc.setFontSize(9)
+    doc.setTextColor(...INK_LO)
+    doc.text(points.length ? 'Apenas uma avaliação registrada: ainda não há evolução para mostrar.' : 'Nenhuma avaliação registrada.', marginX, y + 10)
+    y += 30
+  } else {
+    // gráfico de linha: Y 0–100, X = avaliações em ordem cronológica
+    const cx0 = marginX + 28
+    const cw2 = contentWidth - 40
+    const ch = 170
+    const top = y + 8
+    const X = i => cx0 + 12 + (i / (points.length - 1)) * (cw2 - 24)
+    const Y = v => top + (1 - v / 100) * ch
+
+    doc.setFont(FONT, 'normal')
+    doc.setFontSize(7)
+    ;[0, 25, 50, 75, 100].forEach(v => {
+      doc.setDrawColor(...(v === 0 ? LINE : LINE_SOFT))
+      if (v) doc.setLineDashPattern([1, 2], 0)
+      doc.line(cx0, Y(v), cx0 + cw2, Y(v))
+      doc.setLineDashPattern([], 0)
+      doc.setTextColor(...INK_LO)
+      doc.text(String(v), cx0 - 6, Y(v) + 2.5, { align: 'right' })
+    })
+
+    doc.setDrawColor(...INK_MID)
+    doc.setLineWidth(1.4)
+    for (let i = 1; i < points.length; i += 1) {
+      doc.line(X(i - 1), Y(points[i - 1].overall), X(i), Y(points[i].overall))
+    }
+    doc.setLineWidth(0.5)
+
+    const step = labelStep(points.length, 7)
+    points.forEach((p, i) => {
+      const isCur = p.id === stats.current?.id
+      const isRef = p.id === referenceId
+      if (isRef) {
+        doc.setDrawColor(...REF)
+        doc.setLineWidth(1.2)
+        doc.circle(X(i), Y(p.overall), 6, 'S')
+        doc.setLineWidth(0.5)
+      }
+      doc.setDrawColor(...INK)
+      doc.setFillColor(...(isCur ? INK : BG))
+      doc.circle(X(i), Y(p.overall), isCur ? 3.6 : 2.8, 'FD')
+      if (points.length <= 12) {
+        doc.setFont(FONT, 'bold')
+        doc.setFontSize(7.5)
+        doc.setTextColor(...INK)
+        doc.text(String(p.overall), X(i), Y(p.overall) - 8, { align: 'center' })
+      }
+      if (i % step === 0 || i === points.length - 1) {
+        doc.setFont(FONT, 'normal')
+        doc.setFontSize(6.5)
+        doc.setTextColor(...INK_LO)
+        doc.text(formatDate(p.date), X(i), top + ch + 14, { align: 'center' })
+      }
+    })
+    y = top + ch + 34
+
+    // legenda do gráfico
+    doc.setFont(FONT, 'normal')
+    doc.setFontSize(7)
+    doc.setFillColor(...INK)
+    doc.circle(marginX + 4, y - 2.5, 3, 'F')
+    doc.setTextColor(...INK_LO)
+    doc.text('ATUAL', marginX + 12, y, { charSpace: 0.4 })
+    doc.setDrawColor(...REF)
+    doc.circle(marginX + 64, y - 2.5, 4, 'S')
+    doc.text('REFERÊNCIA', marginX + 72, y, { charSpace: 0.4 })
+    y += 22
+  }
+
+  if (invalidDates) {
+    doc.setFontSize(7.5)
+    doc.setTextColor(...WARN)
+    doc.text(`${invalidDates} registro(s) com data inválida não aparecem no gráfico.`, marginX, y)
+    y += 16
+  }
+
+  // tabela: mais recente primeiro
+  if (points.length) {
+    const cols = [
+      ['#', marginX, 'left'],
+      ['DATA', marginX + 28, 'left'],
+      ['RESPONSÁVEL', marginX + 140, 'left'],
+      ['NOTA', marginX + contentWidth - 130, 'right'],
+      ['VARIAÇÃO', marginX + contentWidth - 50, 'right'],
+      ['', marginX + contentWidth, 'right']
+    ]
+    const head = () => {
+      doc.setFont(FONT, 'bold')
+      doc.setFontSize(7)
+      doc.setTextColor(...INK_LO)
+      cols.forEach(([k, x, a]) => doc.text(k, x, y, { align: a, charSpace: 0.4 }))
+      y += 7
+      doc.setDrawColor(...LINE)
+      doc.line(marginX, y, marginX + contentWidth, y)
+      y += 14
+    }
+    head()
+    points.slice().reverse().forEach(p => {
+      if (y > 790) { y = newPage(doc); head() }
+      doc.setFont(FONT, 'normal')
+      doc.setFontSize(8)
+      doc.setTextColor(...INK_MID)
+      doc.text(`#${p.n}`, cols[0][1], y)
+      doc.text(formatDate(p.date, true), cols[1][1], y)
+      doc.text(doc.splitTextToSize(p.responsavel || '—', 170)[0], cols[2][1], y)
+      doc.setFont(FONT, 'bold')
+      doc.setTextColor(...INK)
+      doc.text(`${p.overall}/100`, cols[3][1], y, { align: 'right' })
+      doc.setFont(FONT, 'normal')
+      const d = p.deltaPts
+      doc.setTextColor(...(d === null ? INK_LO : d > 0 ? SAFE : d < 0 ? CRIT : INK_LO))
+      doc.text(d === null ? '—' : `${signed(d)} pts`, cols[4][1], y, { align: 'right' })
+      const tag = p.id === stats.current?.id ? 'ATUAL' : p.id === referenceId ? 'REF.' : ''
+      if (tag) {
+        doc.setTextColor(...(tag === 'REF.' ? REF : INK))
+        doc.text(tag, cols[5][1], y, { align: 'right' })
+      }
+      y += 6
+      doc.setDrawColor(...LINE_SOFT)
+      doc.line(marginX, y, marginX + contentWidth, y)
+      y += 13
+    })
+  }
 }

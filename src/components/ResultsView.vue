@@ -70,8 +70,8 @@
             <span class="mhead__fill"></span>
             <label v-if="compareOptions.length" class="cmp">
               <span class="cmp__k">Comparar com</span>
-              <select v-model="compareDate" class="cmp__sel">
-                <option v-for="o in compareOptions" :key="o.date" :value="o.date">{{ o.label }}</option>
+              <select v-model="referenceId" class="cmp__sel" aria-label="Avaliação de referência">
+                <option v-for="o in compareOptions" :key="o.id" :value="o.id">{{ o.label }}</option>
               </select>
             </label>
             <span v-else class="mhead__meta">Sem referência</span>
@@ -145,7 +145,7 @@
         </div>
       </div>
 
-      <!-- 06 · histórico -->
+      <!-- histórico -->
       <div class="frame mod" v-reveal>
         <span class="frame__led frame__led--solo" data-led="6"></span>
         <div class="frame__in">
@@ -153,27 +153,41 @@
             <span class="index">{{ previousEntry ? '06' : '05' }}</span>
             <span class="mhead__t" v-scramble>Histórico</span>
             <span class="mhead__fill"></span>
-            <span class="mhead__meta">{{ historyLabel }}</span>
+            <span class="mhead__meta">{{ history.length === 1 ? '1 avaliação' : `${history.length} avaliações` }}</span>
           </div>
           <HistoryPanel
             :entries="history"
-            :company-name="companyName"
-            :compare-date="compareDate"
-            :question-count="questions.length"
-            @compare="compareDate = $event"
-            @updated="$emit('history-updated', $event)"
+            :current-id="currentId"
+            :reference-id="previousEntry ? previousEntry.id : ''"
+            @select-reference="referenceId = $event"
           />
         </div>
       </div>
 
-      <!-- ações -->
+      <!-- arquivos: relatório PDF + backup JSON -->
+      <div class="frame mod" v-reveal>
+        <span class="frame__led frame__led--solo" data-led="1"></span>
+        <div class="frame__in">
+          <div class="mhead">
+            <span class="index">{{ previousEntry ? '07' : '06' }}</span>
+            <span class="mhead__t" v-scramble>Arquivos</span>
+            <span class="mhead__fill"></span>
+            <span class="mhead__meta mhead__meta--long">Relatório e backup</span>
+          </div>
+          <div class="mbody">
+            <DataActions
+              :company-name="companyName"
+              :entries="history"
+              :questions="questions"
+              :make-pdf="downloadPdf"
+              @imported="$emit('history-updated', $event)"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- navegação -->
       <footer class="results__foot" v-reveal>
-        <button class="btn btn--ghost" @click="downloadPdf" :disabled="generatingPdf">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M12 3v13m0 0-4.5-4.5M12 16l4.5-4.5M4 20h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <span v-scramble>{{ generatingPdf ? 'Gerando relatório...' : 'Baixar PDF' }}</span>
-        </button>
 
         <button class="btn btn--ghost" @click="$emit('home')">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -197,14 +211,16 @@
 import GaugeChart from './GaugeChart.vue'
 import ThemeCard from './ThemeCard.vue'
 import ActionPlanList from './ActionPlanList.vue'
-import HistoryPanel from './HistoryPanel.vue'
 import RadarChart from './RadarChart.vue'
 import AnswerChanges from './AnswerChanges.vue'
+import HistoryPanel from './HistoryPanel.vue'
+import DataActions from './DataActions.vue'
+import { sortChrono } from '../utils/storage.js'
 import { THEME_WEIGHTS, getWeakestTheme, buildActionPlan } from '../utils/scoring.js'
 
 export default {
   name: 'ResultsView',
-  components: { GaugeChart, ThemeCard, ActionPlanList, HistoryPanel, RadarChart, AnswerChanges },
+  components: { GaugeChart, ThemeCard, ActionPlanList, RadarChart, AnswerChanges, HistoryPanel, DataActions },
   props: {
     companyName: {
       type: String,
@@ -233,16 +249,26 @@ export default {
     answers: {
       type: Array,
       required: true
+    },
+    currentId: {
+      type: String,
+      default: ''
     }
   },
   emits: ['restart', 'home', 'history-updated'],
   data() {
-    const n = this.history.length
     return {
-      // por padrão compara com a avaliação imediatamente anterior
-      compareDate: n >= 2 ? this.history[n - 2].date : '',
-      themes: Object.keys(THEME_WEIGHTS),
-      generatingPdf: false
+      referenceId: '',
+      themes: Object.keys(THEME_WEIGHTS)
+    }
+  },
+  created() {
+    this.referenceId = this.defaultReferenceId()
+  },
+  watch: {
+    // importação/substituição: se a referência sumiu, volta para a anterior
+    history() {
+      if (!this.previousEntry) this.referenceId = this.defaultReferenceId()
     }
   },
   computed: {
@@ -261,20 +287,25 @@ export default {
     actionPlan() {
       return buildActionPlan(this.themeScores)
     },
-    // o histórico já inclui a avaliação atual (salva antes de abrir esta
-    // tela, sempre a última): as demais são candidatas a referência
+    sortedHistory() {
+      return sortChrono(this.history)
+    },
+    // candidatas a referência: todas as avaliações persistidas, menos a atual
+    others() {
+      return this.sortedHistory.filter(e => e.id !== this.currentId)
+    },
     compareOptions() {
-      return this.history
-        .slice(0, -1)
-        .map((e, i, arr) => ({
-          date: e.date,
-          label: `${this.fmtDate(e.date)} · ${e.overall}/100${i === arr.length - 1 ? ' · anterior' : ''}`
+      const prevId = this.defaultReferenceId()
+      return this.others
+        .map(e => ({
+          id: e.id,
+          label: `${this.fmtDate(e.date)} · ${e.overall}/100${e.id === prevId ? ' · anterior' : ''}`
         }))
         .reverse()
     },
     previousEntry() {
-      if (!this.compareDate) return null
-      return this.history.slice(0, -1).find(e => e.date === this.compareDate) || null
+      if (!this.referenceId) return null
+      return this.others.find(e => e.id === this.referenceId) || null
     },
     overallDelta() {
       return this.previousEntry ? this.overall - this.previousEntry.overall : null
@@ -284,23 +315,17 @@ export default {
     },
     previousDate() {
       return this.previousEntry ? this.fmtDate(this.previousEntry.date) : ''
-    },
-    historyLabel() {
-      const n = this.history.length
-      return n === 1 ? '1 avaliação' : `${n} avaliações`
-    }
-  },
-  watch: {
-    // depois de importar um histórico, a referência escolhida pode não existir
-    // mais na lista (ou nem havia uma): volta para a anterior
-    history() {
-      if (!this.previousEntry) {
-        const n = this.history.length
-        this.compareDate = n >= 2 ? this.history[n - 2].date : ''
-      }
     }
   },
   methods: {
+    // referência padrão: a avaliação imediatamente anterior à atual
+    defaultReferenceId() {
+      const list = sortChrono(this.history)
+      const i = list.findIndex(e => e.id === this.currentId)
+      if (i > 0) return list[i - 1].id
+      if (i === -1 && list.length) return list[list.length - 1].id
+      return ''
+    },
     fmtDate(iso) {
       const d = new Date(iso)
       if (isNaN(d)) return ''
@@ -314,15 +339,10 @@ export default {
     // de engordar o bundle inicial do app. O pequeno atraso é só pra dar
     // tempo do texto do botão decodificar (v-scramble) antes de disparar
     // o download — o PDF em si não anima, é um arquivo estático.
+    // import dinâmico: jsPDF só é baixado quando o relatório é pedido.
+    // Lança em caso de erro, para o DataActions mostrar a mensagem.
     async downloadPdf() {
-      if (this.generatingPdf) return
-      this.generatingPdf = true
-
-      const [{ exportResultsPdf }] = await Promise.all([
-        import('../utils/pdfExport.js'),
-        new Promise(resolve => setTimeout(resolve, 650))
-      ])
-
+      const { exportResultsPdf } = await import('../utils/pdfExport.js')
       exportResultsPdf({
         companyName: this.companyName,
         responsavel: this.responsavel,
@@ -332,10 +352,11 @@ export default {
         actionPlan: this.actionPlan,
         previousScores: this.previousScores,
         previousDate: this.previousDate,
-        previousOverall: this.previousEntry ? this.previousEntry.overall : null
+        previousOverall: this.previousEntry ? this.previousEntry.overall : null,
+        history: this.sortedHistory,
+        currentId: this.currentId,
+        referenceId: this.previousEntry ? this.previousEntry.id : ''
       })
-
-      this.generatingPdf = false
     }
   }
 }
