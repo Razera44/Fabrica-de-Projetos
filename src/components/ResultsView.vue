@@ -50,7 +50,7 @@
               <span class="mhead__meta">0 – 100</span>
             </div>
             <div class="hatch"></div>
-            <GaugeChart :score="overall" />
+            <GaugeChart :score="overall" :delta="overallDelta" :delta-ref="previousDate" />
             <!-- os pesos viram rodapé da caixa, em vez de um parágrafo solto -->
             <div class="mfoot">
               <span>Pesos no cálculo:</span>
@@ -60,15 +60,41 @@
         </div>
       </div>
 
-      <!-- 02 + 03: análise. Notas por tema explicam de onde vêm as
+      <!-- 02 · radar comparativo -->
+      <div class="frame mod" v-reveal>
+        <span class="frame__led frame__led--solo" data-led="2"></span>
+        <div class="frame__in">
+          <div class="mhead">
+            <span class="index">02</span>
+            <span class="mhead__t" v-scramble>Radar comparativo</span>
+            <span class="mhead__fill"></span>
+            <label v-if="compareOptions.length" class="cmp">
+              <span class="cmp__k">Comparar com</span>
+              <select v-model="compareDate" class="cmp__sel">
+                <option v-for="o in compareOptions" :key="o.date" :value="o.date">{{ o.label }}</option>
+              </select>
+            </label>
+            <span v-else class="mhead__meta">Sem referência</span>
+          </div>
+          <RadarChart
+            :scores="themeScores"
+            :previous="previousScores"
+            :previous-date="previousDate"
+            :questions="questions"
+            :answers="answers"
+          />
+        </div>
+      </div>
+
+      <!-- 03 + 04: análise. Notas por tema explicam de onde vêm as
            prioridades do plano ao lado. -->
       <div class="results__row">
-        <!-- 02 · notas por tema -->
+        <!-- 03 · notas por tema -->
         <div class="frame mod" v-reveal>
-          <span class="frame__led frame__led--solo" data-led="2"></span>
+          <span class="frame__led frame__led--solo" data-led="3"></span>
           <div class="frame__in">
             <div class="mhead">
-              <span class="index">02</span>
+              <span class="index">03</span>
               <span class="mhead__t" v-scramble>Notas por tema</span>
               <span class="mhead__fill"></span>
               <span class="mhead__meta mhead__meta--long">Do mais frágil ao mais forte</span>
@@ -86,12 +112,12 @@
           </div>
         </div>
 
-        <!-- 03 · plano de ação (o 1º item absorve o antigo card de atenção) -->
+        <!-- 04 · plano de ação (o 1º item absorve o antigo card de atenção) -->
         <div class="frame mod" v-reveal>
-          <span class="frame__led frame__led--solo" data-led="3"></span>
+          <span class="frame__led frame__led--solo" data-led="4"></span>
           <div class="frame__in">
             <div class="mhead">
-              <span class="index">03</span>
+              <span class="index">04</span>
               <span class="mhead__t" v-scramble>Plano de ação</span>
               <span class="mhead__fill"></span>
               <span class="mhead__meta">{{ actionPlan.length }} itens</span>
@@ -101,17 +127,42 @@
         </div>
       </div>
 
-      <!-- 04 · histórico -->
-      <div class="frame mod" v-reveal>
-        <span class="frame__led frame__led--solo" data-led="4"></span>
+      <!-- 05 · mudanças nas respostas (só existe com referência) -->
+      <div v-if="previousEntry" class="frame mod" v-reveal>
+        <span class="frame__led frame__led--solo" data-led="5"></span>
         <div class="frame__in">
           <div class="mhead">
-            <span class="index">04</span>
+            <span class="index">05</span>
+            <span class="mhead__t" v-scramble>Mudanças nas respostas</span>
+            <span class="mhead__fill"></span>
+            <span class="mhead__meta mhead__meta--long">vs {{ previousDate }}</span>
+          </div>
+          <AnswerChanges
+            :questions="questions"
+            :answers="answers"
+            :previous-answers="previousEntry.answers || null"
+          />
+        </div>
+      </div>
+
+      <!-- 06 · histórico -->
+      <div class="frame mod" v-reveal>
+        <span class="frame__led frame__led--solo" data-led="6"></span>
+        <div class="frame__in">
+          <div class="mhead">
+            <span class="index">{{ previousEntry ? '06' : '05' }}</span>
             <span class="mhead__t" v-scramble>Histórico</span>
             <span class="mhead__fill"></span>
             <span class="mhead__meta">{{ historyLabel }}</span>
           </div>
-          <HistoryPanel :entries="history" />
+          <HistoryPanel
+            :entries="history"
+            :company-name="companyName"
+            :compare-date="compareDate"
+            :question-count="questions.length"
+            @compare="compareDate = $event"
+            @updated="$emit('history-updated', $event)"
+          />
         </div>
       </div>
 
@@ -147,11 +198,13 @@ import GaugeChart from './GaugeChart.vue'
 import ThemeCard from './ThemeCard.vue'
 import ActionPlanList from './ActionPlanList.vue'
 import HistoryPanel from './HistoryPanel.vue'
+import RadarChart from './RadarChart.vue'
+import AnswerChanges from './AnswerChanges.vue'
 import { THEME_WEIGHTS, getWeakestTheme, buildActionPlan } from '../utils/scoring.js'
 
 export default {
   name: 'ResultsView',
-  components: { GaugeChart, ThemeCard, ActionPlanList, HistoryPanel },
+  components: { GaugeChart, ThemeCard, ActionPlanList, HistoryPanel, RadarChart, AnswerChanges },
   props: {
     companyName: {
       type: String,
@@ -172,11 +225,22 @@ export default {
     history: {
       type: Array,
       required: true
+    },
+    questions: {
+      type: Array,
+      required: true
+    },
+    answers: {
+      type: Array,
+      required: true
     }
   },
-  emits: ['restart', 'home'],
+  emits: ['restart', 'home', 'history-updated'],
   data() {
+    const n = this.history.length
     return {
+      // por padrão compara com a avaliação imediatamente anterior
+      compareDate: n >= 2 ? this.history[n - 2].date : '',
       themes: Object.keys(THEME_WEIGHTS),
       generatingPdf: false
     }
@@ -197,12 +261,52 @@ export default {
     actionPlan() {
       return buildActionPlan(this.themeScores)
     },
+    // o histórico já inclui a avaliação atual (salva antes de abrir esta
+    // tela, sempre a última): as demais são candidatas a referência
+    compareOptions() {
+      return this.history
+        .slice(0, -1)
+        .map((e, i, arr) => ({
+          date: e.date,
+          label: `${this.fmtDate(e.date)} · ${e.overall}/100${i === arr.length - 1 ? ' · anterior' : ''}`
+        }))
+        .reverse()
+    },
+    previousEntry() {
+      if (!this.compareDate) return null
+      return this.history.slice(0, -1).find(e => e.date === this.compareDate) || null
+    },
+    overallDelta() {
+      return this.previousEntry ? this.overall - this.previousEntry.overall : null
+    },
+    previousScores() {
+      return this.previousEntry ? this.previousEntry.themeScores : null
+    },
+    previousDate() {
+      return this.previousEntry ? this.fmtDate(this.previousEntry.date) : ''
+    },
     historyLabel() {
       const n = this.history.length
       return n === 1 ? '1 avaliação' : `${n} avaliações`
     }
   },
+  watch: {
+    // depois de importar um histórico, a referência escolhida pode não existir
+    // mais na lista (ou nem havia uma): volta para a anterior
+    history() {
+      if (!this.previousEntry) {
+        const n = this.history.length
+        this.compareDate = n >= 2 ? this.history[n - 2].date : ''
+      }
+    }
+  },
   methods: {
+    fmtDate(iso) {
+      const d = new Date(iso)
+      if (isNaN(d)) return ''
+      const p = n => String(n).padStart(2, '0')
+      return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()}`
+    },
     weightLabel(theme) {
       return `${Math.round(THEME_WEIGHTS[theme] * 100)}%`
     },
@@ -225,7 +329,10 @@ export default {
         issuedAt: this.issuedAt,
         overall: this.overall,
         themeScores: this.themeScores,
-        actionPlan: this.actionPlan
+        actionPlan: this.actionPlan,
+        previousScores: this.previousScores,
+        previousDate: this.previousDate,
+        previousOverall: this.previousEntry ? this.previousEntry.overall : null
       })
 
       this.generatingPdf = false
@@ -277,6 +384,40 @@ export default {
 
 .results__gauge :deep(.gauge) {
   padding: clamp(14px, 2.5vh, 22px) 0 clamp(16px, 2.5vh, 24px);
+}
+
+/* seletor de referência no cabeçalho do radar */
+.cmp {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cmp__k { white-space: nowrap; }
+
+.cmp__sel {
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--crit);
+  background: var(--panel-deep);
+  border: 1px solid var(--line-strong);
+  border-radius: 0;
+  padding: 4px 8px;
+  max-width: 220px;
+  cursor: pointer;
+}
+
+.cmp__sel:focus-visible {
+  outline: 1px solid var(--crit);
+  outline-offset: 2px;
+}
+
+@media (max-width: 560px) {
+  .cmp__k { display: none; }
+  .cmp__sel { max-width: 150px; }
 }
 
 .results__foot {

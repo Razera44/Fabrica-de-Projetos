@@ -61,3 +61,48 @@ export function buildActionPlan(themeScores) {
   items.sort((a, b) => a.score - b.score)
   return items
 }
+
+// Área do polígono do radar em relação ao máximo possível (todos os temas
+// em 100). Com eixos igualmente espaçados a área é proporcional à soma dos
+// produtos de vizinhos — então dá pra comparar sem trigonometria.
+export function radarCoverage(themeScores) {
+  const v = Object.keys(THEME_WEIGHTS).map(t => themeScores?.[t] ?? 0)
+  const n = v.length
+  let sum = 0
+  for (let i = 0; i < n; i += 1) sum += v[i] * v[(i + 1) % n]
+  return Math.round((sum / (n * 10000)) * 100)
+}
+
+// Diferença entre a nota mais alta e a mais baixa: quanto menor, mais
+// equilibrada está a proteção entre os temas.
+export function scoreSpread(themeScores) {
+  const v = Object.keys(THEME_WEIGHTS).map(t => themeScores?.[t] ?? 0)
+  return Math.max(...v) - Math.min(...v)
+}
+
+// Compara resposta a resposta. Índice menor = opção mais segura, então
+// "melhorou" é quando o índice diminuiu.
+export function diffAnswers(questions, current, previous) {
+  if (!Array.isArray(current) || !Array.isArray(previous)) return null
+  const improved = []
+  const worsened = []
+  let same = 0
+  questions.forEach((q, i) => {
+    const now = current[i]
+    const before = previous[i]
+    const a = now === null || now === undefined ? 2 : now
+    const b = before === null || before === undefined ? 2 : before
+    if (a === b) { same += 1; return }
+    const item = {
+      index: i,
+      theme: q.theme,
+      text: q.text,
+      before: before === null || before === undefined ? 'Sem resposta' : q.options[before],
+      now: now === null || now === undefined ? 'Sem resposta' : q.options[now],
+      points: OPTION_SCORES[a] - OPTION_SCORES[b]
+    }
+    if (a < b) improved.push(item)
+    else worsened.push(item)
+  })
+  return { improved, worsened, same }
+}

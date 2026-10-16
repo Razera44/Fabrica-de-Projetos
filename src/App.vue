@@ -50,6 +50,9 @@
             :theme-scores="themeScores"
             :overall="overall"
             :history="history"
+            :questions="questions"
+            :answers="answers"
+            @history-updated="history = $event"
             @restart="restart"
             @home="goHome"
           />
@@ -146,6 +149,8 @@ export default {
         date: new Date().toISOString(),
         overall: this.overall,
         themeScores: this.themeScores,
+        // respostas guardadas para comparar pergunta a pergunta depois
+        answers: this.answers.slice(),
         companyName: this.companyName,
         responsavel: this.responsavel
       })

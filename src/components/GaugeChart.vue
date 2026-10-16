@@ -76,6 +76,12 @@
            apagaria o ponto colorido se aplicado no elemento inteiro -->
       <span v-scramble="{ delay: 700, duration: 1700 }">{{ tier.label.toUpperCase() }}</span>
     </div>
+
+    <!-- variação em relação à avaliação de referência -->
+    <div v-if="delta !== null" class="gauge__delta" :class="deltaClass">
+      <b>{{ deltaText }}</b>
+      <span>vs {{ deltaRef || 'anterior' }}</span>
+    </div>
   </div>
 </template>
 
@@ -92,6 +98,14 @@ export default {
     score: {
       type: Number,
       required: true
+    },
+    delta: {
+      type: Number,
+      default: null
+    },
+    deltaRef: {
+      type: String,
+      default: ''
     }
   },
   data() {
@@ -104,6 +118,14 @@ export default {
     tier() {
       // classificação sempre pela nota real, nunca pelo valor animado
       return getTier(this.score)
+    },
+    deltaClass() {
+      return this.delta > 0 ? 'is-up' : this.delta < 0 ? 'is-down' : 'is-flat'
+    },
+    deltaText() {
+      if (this.delta > 0) return `▲ +${this.delta}`
+      if (this.delta < 0) return `▼ −${Math.abs(this.delta)}`
+      return '■ ±0'
     },
     tierColor() {
       return `var(--${this.tier.tone})`
@@ -241,6 +263,29 @@ export default {
   gap: 8px;
   margin-top: 4px;
 }
+
+.gauge__delta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 3px 9px;
+  border: 1px solid currentColor;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.gauge__delta b {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.gauge__delta span { color: var(--ink-lo); }
+.gauge__delta.is-up { color: var(--safe); }
+.gauge__delta.is-down { color: var(--crit); }
+.gauge__delta.is-flat { color: var(--ink-lo); }
 
 .gauge__dot {
   width: 6px;
