@@ -80,29 +80,51 @@ export function scoreSpread(themeScores) {
   return Math.max(...v) - Math.min(...v)
 }
 
-// Compara resposta a resposta. Índice menor = opção mais segura, então
-// "melhorou" é quando o índice diminuiu.
+// Nível de segurança de uma resposta, na mesma escala da pontuação: cada
+// pergunta lista as opções da mais segura (100) para a mais arriscada (0).
+// Devolve null quando a resposta não existe ou não é uma opção da pergunta.
+export function answerScore(question, option) {
+  if (!Number.isInteger(option)) return null
+  if (option < 0 || option >= question.options.length) return null
+  return OPTION_SCORES[option] ?? null
+}
+
+// Situação de uma pergunta entre duas avaliações: 'improved', 'worsened',
+// 'same' ou 'unrated' (falta resposta em um dos lados, então não dá para
+// afirmar que houve melhora, piora ou estabilidade).
+export function classifyChange(question, before, now) {
+  const a = answerScore(question, now)
+  const b = answerScore(question, before)
+  if (a === null || b === null) return 'unrated'
+  if (a > b) return 'improved'
+  if (a < b) return 'worsened'
+  return 'same'
+}
+
+// Compara resposta a resposta. Cada pergunta cai em exatamente um grupo;
+// `same` continua sendo a contagem de iguais.
 export function diffAnswers(questions, current, previous) {
   if (!Array.isArray(current) || !Array.isArray(previous)) return null
   const improved = []
   const worsened = []
-  let same = 0
+  const unchanged = []
+  const unrated = []
+  const label = (q, option) => (answerScore(q, option) === null ? 'Sem resposta' : q.options[option])
   questions.forEach((q, i) => {
-    const now = current[i]
-    const before = previous[i]
-    const a = now === null || now === undefined ? 2 : now
-    const b = before === null || before === undefined ? 2 : before
-    if (a === b) { same += 1; return }
+    const status = classifyChange(q, previous[i], current[i])
     const item = {
       index: i,
       theme: q.theme,
       text: q.text,
-      before: before === null || before === undefined ? 'Sem resposta' : q.options[before],
-      now: now === null || now === undefined ? 'Sem resposta' : q.options[now],
-      points: OPTION_SCORES[a] - OPTION_SCORES[b]
+      status,
+      before: label(q, previous[i]),
+      now: label(q, current[i]),
+      points: status === 'unrated' ? null : answerScore(q, current[i]) - answerScore(q, previous[i])
     }
-    if (a < b) improved.push(item)
-    else worsened.push(item)
+    if (status === 'improved') improved.push(item)
+    else if (status === 'worsened') worsened.push(item)
+    else if (status === 'same') unchanged.push(item)
+    else unrated.push(item)
   })
-  return { improved, worsened, same }
+  return { improved, worsened, unchanged, unrated, same: unchanged.length }
 }

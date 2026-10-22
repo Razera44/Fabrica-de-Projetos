@@ -1,5 +1,13 @@
 <template>
-  <div class="rdr" :class="{ 'has-active': active !== null, 'is-compact': compact }">
+  <div
+    class="rdr"
+    :class="{
+      'has-active': active !== null,
+      'is-compact': compact,
+      'is-pending': stage === 'pending',
+      'is-intro': stage === 'intro'
+    }"
+  >
     <!-- ================= GRÁFICO ================= -->
     <div class="rdr__stage">
       <div class="rdr__plot">
@@ -25,10 +33,15 @@
           <marker :id="uid('arr-down')" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
             <path d="M0 0 L8 4 L0 8 z" class="rdr__arrow rdr__arrow--down" />
           </marker>
+          <!-- entrada: a linha tracejada da referência é "desenhada" por uma
+               máscara contínua, já que o próprio tracejado ocupa o dasharray -->
+          <mask v-if="previous" :id="uid('draw')" maskUnits="userSpaceOnUse" x="0" y="0" :width="W" :height="H">
+            <polygon :points="poly(shownPrev)" pathLength="1" class="rdr__drawpath" />
+          </mask>
         </defs>
 
         <!-- cantoneiras e leituras de HUD -->
-        <g class="rdr__hud">
+        <g class="rdr__hud rdr__ix rdr__ix--grid">
           <path :d="`M 8 26 V 8 H 26`" />
           <path :d="`M ${W - 26} 8 H ${W - 8} V 26`" />
           <path :d="`M 8 ${H - 26} V ${H - 8} H 26`" />
@@ -42,7 +55,7 @@
         </g>
 
         <!-- moldura circular com graduação -->
-        <g class="rdr__bezel">
+        <g class="rdr__bezel rdr__ix rdr__ix--grid">
           <circle :cx="CX" :cy="CY" :r="R + 16" class="rdr__ring" />
           <line
             v-for="t in bezelTicks"
@@ -51,31 +64,34 @@
             :class="t.major ? 'rdr__btick rdr__btick--major' : 'rdr__btick'"
           />
         </g>
-        <circle :cx="CX" :cy="CY" :r="R + 10" class="rdr__ring rdr__ring--inner" />
 
-        <!-- faixas de risco -->
-        <path :d="band(70, 100)" class="rdr__band rdr__band--safe" fill-rule="evenodd" />
-        <path :d="band(40, 70)" class="rdr__band rdr__band--warn" fill-rule="evenodd" />
-        <path :d="band(0, 40)" class="rdr__band rdr__band--crit" fill-rule="evenodd" />
+        <g class="rdr__ix rdr__ix--grid">
+          <circle :cx="CX" :cy="CY" :r="R + 10" class="rdr__ring rdr__ring--inner" />
 
-        <!-- grade -->
-        <polygon
-          v-for="lvl in [20, 40, 60, 80, 100]"
-          :key="'g' + lvl"
-          :points="ring(lvl)"
-          :class="['rdr__grid', { 'rdr__grid--edge': lvl === 40 || lvl === 100 }]"
-        />
-        <polygon :points="ring(70)" class="rdr__grid rdr__grid--edge" />
+          <!-- faixas de risco -->
+          <path :d="band(70, 100)" class="rdr__band rdr__band--safe" fill-rule="evenodd" />
+          <path :d="band(40, 70)" class="rdr__band rdr__band--warn" fill-rule="evenodd" />
+          <path :d="band(0, 40)" class="rdr__band rdr__band--crit" fill-rule="evenodd" />
+
+          <!-- grade -->
+          <polygon
+            v-for="lvl in [20, 40, 60, 80, 100]"
+            :key="'g' + lvl"
+            :points="ring(lvl)"
+            :class="['rdr__grid', { 'rdr__grid--edge': lvl === 40 || lvl === 100 }]"
+          />
+          <polygon :points="ring(70)" class="rdr__grid rdr__grid--edge" />
+        </g>
 
         <!-- rótulos das faixas, ao longo da aresta superior-esquerda -->
-        <g class="rdr__bandtxt">
+        <g class="rdr__bandtxt rdr__ix rdr__ix--scale">
           <text :transform="edgeLabel(20)">CRÍTICO</text>
           <text :transform="edgeLabel(55)">MODERADO</text>
           <text :transform="edgeLabel(85)">BAIXO</text>
         </g>
 
         <!-- escala numérica no eixo superior -->
-        <g class="rdr__scale">
+        <g class="rdr__scale rdr__ix rdr__ix--scale">
           <text
             v-for="lvl in [20, 40, 60, 80]"
             :key="'s' + lvl"
@@ -85,26 +101,42 @@
         </g>
 
         <!-- eixos com réguas -->
-        <g v-for="(t, i) in themes" :key="'ax' + t" :class="['rdr__axisg', { 'is-active': active === i }]">
-          <line :x1="CX" :y1="CY" :x2="pt(i, 100).x" :y2="pt(i, 100).y" class="rdr__axis" />
-          <line
-            v-for="tk in axisTicks(i)"
-            :key="tk.v"
-            :x1="tk.x1" :y1="tk.y1" :x2="tk.x2" :y2="tk.y2"
-            class="rdr__tick"
-          />
+        <g
+          v-for="(t, i) in themes"
+          :key="'ax' + t"
+          :class="['rdr__axisg', { 'is-active': active === i }]"
+          :style="{ '--i': i }"
+        >
+          <line :x1="CX" :y1="CY" :x2="pt(i, 100).x" :y2="pt(i, 100).y" pathLength="1" class="rdr__axis" />
+          <g class="rdr__ix rdr__ix--scale">
+            <line
+              v-for="tk in axisTicks(i)"
+              :key="tk.v"
+              :x1="tk.x1" :y1="tk.y1" :x2="tk.x2" :y2="tk.y2"
+              class="rdr__tick"
+            />
+          </g>
         </g>
 
         <!-- avaliação de referência -->
         <g v-if="previous" class="rdr__prev">
-          <polygon :points="poly(previous)" class="rdr__area--prev" />
-          <g v-for="(t, i) in themes" :key="'p' + t">
-            <circle :cx="pt(i, previous[t]).x" :cy="pt(i, previous[t]).y" r="3.2" class="rdr__pdot" />
-          </g>
+          <polygon :points="poly(shownPrev)" class="rdr__area--prev rdr__prevfill rdr__ix rdr__ix--prevfill" />
+          <polygon
+            :points="poly(shownPrev)"
+            class="rdr__area--prev rdr__prevline"
+            :mask="stage === 'intro' ? `url(#${uid('draw')})` : null"
+          />
+          <circle
+            v-for="(t, i) in themes"
+            :key="'p' + t"
+            :cx="pt(i, shownPrev[t]).x" :cy="pt(i, shownPrev[t]).y"
+            :r="active === i ? 4.4 : 3.2"
+            :class="['rdr__pdot', 'rdr__ix', 'rdr__ix--pdot', { 'is-active': active === i }]"
+          />
         </g>
 
         <!-- avaliação atual -->
-        <polygon :points="poly(shown)" class="rdr__area--cur" :filter="`url(#${uid('glow')})`" />
+        <polygon :points="poly(shown)" class="rdr__area--cur rdr__ix rdr__ix--cur" :filter="`url(#${uid('glow')})`" />
 
         <!-- vetores de mudança: da posição anterior até a atual -->
         <g v-if="previous && settled" class="rdr__vectors">
@@ -120,7 +152,12 @@
         </g>
 
         <!-- vértices -->
-        <g v-for="(t, i) in themes" :key="'n' + t" :class="['rdr__nodeg', { 'is-weak': t === weakest, 'is-active': active === i }]">
+        <g
+          v-for="(t, i) in themes"
+          :key="'n' + t"
+          :class="['rdr__nodeg', 'rdr__ix', 'rdr__ix--node', { 'is-weak': t === weakest, 'is-active': active === i }]"
+          :style="{ '--i': i }"
+        >
           <rect
             :x="pt(i, shown[t]).x - 9" :y="pt(i, shown[t]).y - 9"
             width="18" height="18"
@@ -134,7 +171,7 @@
         </g>
 
         <!-- mira central -->
-        <g class="rdr__cross">
+        <g class="rdr__cross rdr__ix rdr__ix--grid">
           <line :x1="CX - 6" :y1="CY" :x2="CX + 6" :y2="CY" />
           <line :x1="CX" :y1="CY - 6" :x2="CX" :y2="CY + 6" />
         </g>
@@ -143,17 +180,18 @@
         <g
           v-for="(t, i) in themes"
           :key="'l' + t"
-          :class="['rdr__lbl', { 'is-active': active === i }]"
+          :class="['rdr__lbl', 'rdr__ix', 'rdr__ix--lbl', { 'is-active': active === i }]"
+          :style="{ '--i': i }"
           :transform="`translate(${labelPos(i).x} ${labelPos(i).y})`"
           :text-anchor="labelPos(i).anchor"
         >
           <text y="0" class="rdr__lname">
             <tspan>{{ t.toUpperCase() }}</tspan>
-            <tspan class="rdr__lval" dx="7">{{ scores[t] }}</tspan>
+            <tspan class="rdr__lval" dx="7">{{ num(t) }}</tspan>
           </text>
           <text :y="compact ? 22 : 15" class="rdr__lmeta">
             <tspan>PESO {{ weight(t) }}</tspan>
-            <tspan v-if="previous" :class="deltaClass(t)"> · {{ deltaText(t) }}</tspan>
+            <tspan v-if="previous" :class="['rdr__dlt', deltaClass(t)]"> · {{ deltaText(t) }}</tspan>
           </text>
           <!-- uma célula por pergunta do tema, na cor da resposta -->
           <g :transform="`translate(${stripOffset(i)} ${compact ? 32 : 22})`">
@@ -203,9 +241,12 @@
         <div class="readout"><span class="readout__k">Peso</span><span class="readout__dots"></span><span class="readout__v">{{ weight(themes[active]) }}</span></div>
         <template v-if="previous">
           <div class="readout"><span class="readout__k">Ref. {{ previousDate }}</span><span class="readout__dots"></span><span class="readout__v rdr__refv">{{ previous[themes[active]] }}/100</span></div>
-          <div class="readout"><span class="readout__k">Variação</span><span class="readout__dots"></span><span class="readout__v" :class="deltaClass(themes[active])">{{ signed(delta(themes[active])) }} pts</span></div>
+          <div class="readout"><span class="readout__k">Variação</span><span class="readout__dots"></span><span class="readout__v" :class="signClass(delta(themes[active]))">{{ signed(delta(themes[active])) }} pts</span></div>
+          <!-- quanto essa variação move o índice geral (variação × peso) -->
+          <div class="readout"><span class="readout__k">No índice geral</span><span class="readout__dots"></span><span class="readout__v" :class="signClass(delta(themes[active]))">{{ impactText(themes[active]) }} pts</span></div>
         </template>
         <div v-else class="readout"><span class="readout__k">Referência</span><span class="readout__dots"></span><span class="readout__v">Sem referência</span></div>
+        <div class="readout"><span class="readout__k">Respostas seguras</span><span class="readout__dots"></span><span class="readout__v">{{ answeredLine(themes[active]) }}</span></div>
       </div>
       </div>
     </div>
@@ -216,13 +257,13 @@
         <div class="rdr__stat">
           <span class="rdr__sk">Área coberta</span>
           <span class="rdr__sv">{{ coverage }}<small>%</small></span>
-          <span v-if="previous" class="rdr__sd" :class="signClass(coverage - prevCoverage)">{{ signed(coverage - prevCoverage) }} pp</span>
+          <span v-if="previous" class="rdr__sd rdr__dlt" :class="signClass(coverage - prevCoverage)">{{ signed(coverage - prevCoverage) }} pp</span>
         </div>
         <div class="rdr__stat">
           <span class="rdr__sk">Dispersão</span>
           <span class="rdr__sv">{{ spread }}<small>pts</small></span>
           <!-- dispersão menor é melhor: o sinal da cor é invertido -->
-          <span v-if="previous" class="rdr__sd" :class="signClass(prevSpread - spread)">{{ signed(spread - prevSpread) }} pts</span>
+          <span v-if="previous" class="rdr__sd rdr__dlt" :class="signClass(prevSpread - spread)">{{ signed(spread - prevSpread) }} pts</span>
         </div>
         <div class="rdr__stat">
           <span class="rdr__sk">Evolução</span>
@@ -252,12 +293,12 @@
             <span class="rdr__zone rdr__zone--warn"></span>
             <span class="rdr__zone rdr__zone--safe"></span>
             <span class="rdr__bar" :class="`rdr__bg--${tone(scores[t])}`" :style="{ width: shown[t] + '%' }"></span>
-            <span v-if="previous" class="rdr__pmark" :style="{ left: previous[t] + '%' }" :title="`Referência: ${previous[t]}`"></span>
+            <span v-if="previous" class="rdr__pmark" :style="{ left: shownPrev[t] + '%' }" :title="`Referência: ${previous[t]}`"></span>
           </span>
 
           <span class="rdr__ival">
-            {{ scores[t] }}
-            <small v-if="previous" :class="deltaClass(t)">{{ deltaText(t) }}</small>
+            {{ num(t) }}
+            <small v-if="previous" :class="['rdr__dlt', deltaClass(t)]">{{ deltaText(t) }}</small>
           </span>
         </li>
       </ul>
@@ -285,6 +326,18 @@ import { THEME_WEIGHTS, getTier, radarCoverage, scoreSpread } from '../utils/sco
 let seq = 0
 const TONE_BY_OPTION = ['safe', 'warn', 'crit']
 
+// Linha do tempo da entrada (ms). As etapas visuais estáticas (grade, eixos,
+// escala, referência, preenchimento) são keyframes CSS com estes mesmos
+// atrasos; o crescimento do polígono atual é interpolado aqui.
+const INTRO_GROW_DELAY = 800
+const INTRO_GROW_DUR = 900
+const INTRO_TOTAL = 1950
+// troca de referência / novos dados: transição direta entre as formas
+const UPDATE_DUR = 700
+
+const easeOutCubic = k => 1 - Math.pow(1 - k, 3)
+const easeInOutCubic = k => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2)
+
 export default {
   name: 'RadarChart',
   props: {
@@ -307,20 +360,36 @@ export default {
       themes,
       active: null,
       reduced: false,
-      // valores exibidos (animados) do polígono atual
+      // valores exibidos (animados) dos polígonos atual e de referência;
+      // ao fim de cada animação são exatamente os valores reais
       shown: Object.fromEntries(themes.map(t => [t, 0])),
+      shownPrev: Object.fromEntries(themes.map(t => [t, 0])),
       settled: false,
-      frame: null
+      frame: null,
+      // 'pending' (fora da tela) → 'intro' (sequência de entrada) → 'done'
+      stage: 'done',
+      io: null,
+      introTimer: null
     }
   },
   computed: {
     // no celular o raio encolhe para sobrar espaço aos rótulos, que crescem
-    R() { return this.compact ? 112 : 148 },
+    R() { return this.compact ? 100 : 148 },
     cellStep() { return this.compact ? 15 : 11 },
-    coverage() { return radarCoverage(this.scores) },
-    prevCoverage() { return radarCoverage(this.previous) },
-    spread() { return scoreSpread(this.scores) },
-    prevSpread() { return scoreSpread(this.previous) },
+    // leituras do painel acompanham a geometria animada (inteiros por tema,
+    // como as notas reais); quando a animação termina batem com os dados
+    liveCur() { return Object.fromEntries(this.themes.map(t => [t, this.num(t)])) },
+    livePrev() { return Object.fromEntries(this.themes.map(t => [t, this.pnum(t)])) },
+    coverage() { return radarCoverage(this.liveCur) },
+    prevCoverage() { return radarCoverage(this.livePrev) },
+    spread() { return scoreSpread(this.liveCur) },
+    prevSpread() { return scoreSpread(this.livePrev) },
+    // alvo da animação: muda só quando os dados de fato mudam
+    targetKey() {
+      const cur = this.themes.map(t => this.scores[t] ?? 0).join(',')
+      const prev = this.previous ? this.themes.map(t => this.previous[t] ?? 0).join(',') : '-'
+      return `${cur}|${prev}`
+    },
     weakest() {
       return this.themes.reduce((w, t) => (this.scores[t] < this.scores[w] ? t : w), this.themes[0])
     },
@@ -347,7 +416,7 @@ export default {
       if (worst.d < 0) parts.push(`queda em ${worst.t} (${this.signed(worst.d)})`)
       if (!parts.length) return 'Nenhum tema mudou em relação à referência.'
       const s = parts.join('; ')
-      const cov = this.coverage - this.prevCoverage
+      const cov = radarCoverage(this.scores) - radarCoverage(this.previous)
       const tail = cov === 0 ? '' : ` A área do radar ${cov > 0 ? 'cresceu' : 'encolheu'} ${Math.abs(cov)} pp.`
       return s.charAt(0).toUpperCase() + s.slice(1) + '.' + tail
     },
@@ -375,7 +444,7 @@ export default {
     // ancorado no vértice atual do eixo, em % do viewBox (escala com o SVG)
     tipStyle() {
       const t = this.themes[this.active]
-      const p = this.pt(this.active, this.scores[t])
+      const p = this.pt(this.active, this.shown[t])
       return { left: (p.x / this.W) * 100 + '%', top: (p.y / this.H) * 100 + '%' }
     },
     ariaLabel() {
@@ -386,8 +455,7 @@ export default {
     }
   },
   watch: {
-    previous() { this.animate() },
-    scores() { this.animate() }
+    targetKey() { this.animate() }
   },
   mounted() {
     try {
@@ -396,11 +464,30 @@ export default {
       this.compact = this.mq.matches
       this.mq.addEventListener('change', this.onMq)
     } catch { /* sem matchMedia */ }
-    this.animate()
+
+    if (this.reduced) {
+      this.snap()
+      return
+    }
+    // a entrada só roda quando o radar aparece de fato na tela
+    if (typeof IntersectionObserver === 'function') {
+      this.stage = 'pending'
+      this.io = new IntersectionObserver(entries => {
+        if (!entries.some(e => e.isIntersecting)) return
+        this.io.disconnect()
+        this.io = null
+        this.startIntro()
+      }, { threshold: 0.25 })
+      this.io.observe(this.$el)
+    } else {
+      this.startIntro()
+    }
   },
   beforeUnmount() {
     if (this.mq) this.mq.removeEventListener('change', this.onMq)
     if (this.frame) cancelAnimationFrame(this.frame)
+    if (this.io) this.io.disconnect()
+    clearTimeout(this.introTimer)
   },
   methods: {
     onMq(e) { this.compact = e.matches },
@@ -414,38 +501,92 @@ export default {
     weight(t) { return `${Math.round(THEME_WEIGHTS[t] * 100)}%` },
     tone(score) { return getTier(score).tone },
     tierLabel(score) { return getTier(score).label },
+    // variação real (dados), usada na leitura, nos vetores e no tooltip
     delta(t) { return this.previous ? (this.scores[t] ?? 0) - (this.previous[t] ?? 0) : 0 },
+    // valores exibidos, arredondados como as notas reais
+    num(t) { return Math.round(this.shown[t]) },
+    pnum(t) { return Math.round(this.shownPrev[t]) },
+    // variação exibida: acompanha os dois polígonos durante a transição
+    liveDelta(t) { return this.previous ? this.num(t) - this.pnum(t) : 0 },
     signed(n) { return n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : '±0' },
     signClass(n) { return n > 0 ? 'is-up' : n < 0 ? 'is-down' : 'is-flat' },
     deltaText(t) {
-      const d = this.delta(t)
+      const d = this.liveDelta(t)
       return d > 0 ? `▲${d}` : d < 0 ? `▼${Math.abs(d)}` : '■0'
     },
-    deltaClass(t) { return this.signClass(this.delta(t)) },
+    deltaClass(t) { return this.signClass(this.liveDelta(t)) },
+    // contribuição do tema para a variação do índice geral (Δ × peso), sem
+    // arredondar: o índice arredonda só o total
+    impactText(t) {
+      const v = Math.round(this.delta(t) * THEME_WEIGHTS[t] * 10) / 10
+      const s = Math.abs(v).toFixed(1).replace('.', ',')
+      return v > 0 ? `+${s}` : v < 0 ? `−${s}` : '±0,0'
+    },
 
-    // Se há referência, o polígono "migra" da forma anterior para a atual;
-    // sem referência, cresce do centro.
-    animate() {
+    targets() {
+      const cur = Object.fromEntries(this.themes.map(t => [t, this.scores[t] ?? 0]))
+      const prev = Object.fromEntries(this.themes.map(t => [t, this.previous ? this.previous[t] ?? 0 : 0]))
+      return { cur, prev }
+    },
+    snap() {
       if (this.frame) cancelAnimationFrame(this.frame)
-      const from = Object.fromEntries(this.themes.map(t => [t, this.previous ? this.previous[t] ?? 0 : 0]))
-      const to = this.scores
-      if (this.reduced) {
-        this.themes.forEach(t => { this.shown[t] = to[t] })
-        this.settled = true
-        return
-      }
+      this.frame = null
+      const { cur, prev } = this.targets()
+      this.themes.forEach(t => { this.shown[t] = cur[t]; this.shownPrev[t] = prev[t] })
+      this.settled = true
+    },
+
+    // Interpola os dois polígonos a partir do que está na tela agora: uma
+    // atualização no meio de outra continua do ponto atual, sem saltos. O
+    // último quadro grava os valores exatos, nunca uma aproximação.
+    tween({ dur, delay = 0, ease, from }) {
+      if (this.frame) cancelAnimationFrame(this.frame)
+      const { cur, prev } = this.targets()
+      const fromCur = from?.cur || { ...this.shown }
+      const fromPrev = from?.prev || { ...this.shownPrev }
+      // sem referência não há o que interpolar; se ela voltar, cresce do centro
+      if (!this.previous) this.themes.forEach(t => { fromPrev[t] = 0 })
       this.settled = false
       const start = performance.now()
-      const dur = this.previous ? 1300 : 1000
-      const delay = this.previous ? 350 : 0
       const step = now => {
         const k = Math.max(0, Math.min(1, (now - start - delay) / dur))
-        const e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2
-        this.themes.forEach(t => { this.shown[t] = from[t] + (to[t] - from[t]) * e })
-        if (k < 1) this.frame = requestAnimationFrame(step)
-        else { this.frame = null; this.settled = true }
+        if (k >= 1) {
+          this.themes.forEach(t => { this.shown[t] = cur[t]; this.shownPrev[t] = prev[t] })
+          this.frame = null
+          this.settled = true
+          return
+        }
+        const e = ease(k)
+        this.themes.forEach(t => {
+          this.shown[t] = fromCur[t] + (cur[t] - fromCur[t]) * e
+          this.shownPrev[t] = fromPrev[t] + (prev[t] - fromPrev[t]) * e
+        })
+        this.frame = requestAnimationFrame(step)
       }
       this.frame = requestAnimationFrame(step)
+    },
+
+    // Entrada: grade → eixos → escala → referência desenhada (CSS) e, em
+    // seguida, o polígono atual cresce do centro até os valores reais.
+    startIntro() {
+      const { prev } = this.targets()
+      this.themes.forEach(t => { this.shown[t] = 0; this.shownPrev[t] = prev[t] })
+      this.stage = 'intro'
+      this.tween({
+        dur: INTRO_GROW_DUR,
+        delay: INTRO_GROW_DELAY,
+        ease: easeOutCubic,
+        from: { cur: { ...this.shown }, prev: { ...this.shownPrev } }
+      })
+      clearTimeout(this.introTimer)
+      this.introTimer = setTimeout(() => { this.stage = 'done' }, INTRO_TOTAL)
+    },
+
+    // dados mudaram (outra referência, nova avaliação)
+    animate() {
+      if (this.stage === 'pending') return // a entrada já usará os dados novos
+      if (this.reduced) { this.snap(); return }
+      this.tween({ dur: UPDATE_DUR, ease: easeInOutCubic })
     },
 
     // eixo i: 0 = topo, sentido horário
@@ -499,7 +640,7 @@ export default {
       const a = this.angle(i)
       const c = Math.cos(a)
       const s = Math.sin(a)
-      const r = this.R + (this.compact ? 26 : 40)
+      const r = this.R + (this.compact ? 24 : 40)
       let x = this.CX + r * c
       let y = this.CY + r * s
       let anchor = 'middle'
@@ -661,7 +802,8 @@ export default {
 }
 
 .rdr__axisg { transition: opacity var(--dur) var(--ease); }
-.rdr__axisg.is-active .rdr__axis { stroke: var(--ink-mid); }
+.rdr__axisg.is-active .rdr__axis { stroke: var(--ink-mid); stroke-width: 1.4; }
+.rdr__axisg.is-active .rdr__tick { stroke: var(--ink-mid); }
 
 .rdr__area--prev {
   fill: rgba(var(--ref-rgb), 0.08);
@@ -671,11 +813,27 @@ export default {
   stroke-linejoin: round;
 }
 
+/* preenchimento e contorno separados: só o contorno é "desenhado" na entrada */
+.rdr__prevfill { stroke: none; }
+.rdr__prevline { fill: none; }
+
+.rdr__drawpath {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 12;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+}
+
 .rdr__pdot {
   fill: var(--bg);
   stroke: var(--ref);
   stroke-width: 1.6;
+  transition: r var(--dur-fast) var(--ease);
 }
+
+.rdr__pdot.is-active { fill: var(--ref); }
 
 .rdr__area--cur {
   fill: rgba(var(--ink-rgb), 0.1);
@@ -704,9 +862,56 @@ export default {
 .rdr__fill--warn { fill: var(--g-warn); }
 .rdr__fill--safe { fill: var(--g-safe); }
 
-.rdr__halo { opacity: 0.16; }
-.rdr__node { stroke: var(--bg); stroke-width: 1.5; }
+.rdr__halo { opacity: 0.16; transition: opacity var(--dur-fast) var(--ease); }
+.rdr__node { stroke: var(--bg); stroke-width: 1.5; transition: stroke var(--dur-fast) var(--ease); }
 .rdr__nodeg.is-active .rdr__halo { opacity: 0.4; }
+.rdr__nodeg.is-active .rdr__node { stroke: var(--ink); }
+
+/* ---------- entrada ---------- */
+/* fora da tela, à espera da entrada: nada desenhado ainda */
+.is-pending .rdr__ix,
+.is-pending .rdr__axis,
+.is-pending .rdr__prevline,
+.is-pending .rdr__dlt,
+.is-pending .rdr__vectors { opacity: 0; }
+
+/* 1. grade, anéis e faixas */
+.is-intro .rdr__ix--grid { animation: rdr-in 420ms var(--ease) both; }
+/* 2. eixos traçados do centro para fora, um após o outro */
+.is-intro .rdr__axis {
+  stroke-dasharray: 1;
+  animation: rdr-draw 480ms var(--ease) calc(160ms + var(--i) * 70ms) both;
+}
+.is-intro .rdr__ix--lbl { animation: rdr-in 360ms var(--ease) calc(300ms + var(--i) * 70ms) both; }
+/* 3. réguas e escala */
+.is-intro .rdr__ix--scale { animation: rdr-in 320ms var(--ease) 480ms both; }
+/* 4. referência histórica: contorno tracejado desenhado, depois a área */
+.is-intro .rdr__drawpath { animation: rdr-draw 700ms var(--ease) 560ms both; }
+.is-intro .rdr__ix--prevfill { animation: rdr-in 420ms var(--ease) 1000ms both; }
+.is-intro .rdr__ix--pdot { animation: rdr-in 260ms var(--ease) 1150ms both; }
+/* 5. o polígono atual cresce do centro (JS, a partir de 800ms) e
+   8. a área ganha opacidade enquanto cresce */
+.is-intro .rdr__ix--cur { animation: rdr-fill 900ms var(--ease) 900ms both; }
+/* 6. marcadores nos vértices */
+.is-intro .rdr__ix--node {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: rdr-pop 260ms var(--ease) calc(1450ms + var(--i) * 40ms) both;
+}
+/* 7. variações só aparecem quando os números já chegaram */
+.is-intro .rdr__dlt { animation: rdr-in 300ms var(--ease) 1650ms both; }
+
+@keyframes rdr-in { from { opacity: 0; } }
+@keyframes rdr-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes rdr-fill { from { fill-opacity: 0; } }
+@keyframes rdr-pop { from { opacity: 0; transform: scale(0.2); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .is-intro .rdr__ix,
+  .is-intro .rdr__axis,
+  .is-intro .rdr__drawpath,
+  .is-intro .rdr__dlt { animation: none; }
+}
 
 .rdr__cross line {
   stroke: var(--ink-faint);
