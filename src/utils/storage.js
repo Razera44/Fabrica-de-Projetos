@@ -11,8 +11,12 @@ const COMPANY_KEY = 'segura_empresa'
 const HISTORY_KEY = 'segura_historico'
 const THEME_KEY = 'segura_tema'
 
-// Total de avaliações guardadas, somando TODAS as empresas.
+// Máximo de avaliações guardadas POR EMPRESA (o limite de uma empresa
+// nunca apaga avaliações de outra).
 export const MAX_HISTORY = 200
+
+// Tamanho máximo do nome da empresa (mesmo valor do maxlength do campo).
+export const MAX_COMPANY_LENGTH = 80
 
 export const EXPORT_APP = 'segura-diagnostico'
 export const SCHEMA_VERSION = 2
@@ -22,8 +26,12 @@ export const MAX_IMPORT_BYTES = 2 * 1024 * 1024
 
 const THEMES = Object.keys(THEME_WEIGHTS)
 
+function companyKey(name) {
+  return (name || '').trim().toLowerCase()
+}
+
 export function sameCompany(a, b) {
-  return (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase()
+  return companyKey(a) === companyKey(b)
 }
 
 // ---------------------------------------------------------------------------
@@ -71,11 +79,40 @@ function readAll() {
   try {
     const raw = localStorage.getItem(HISTORY_KEY)
     const data = raw ? JSON.parse(raw) : []
-    return Array.isArray(data) ? data : []
+    // descarta o que não é um registro utilizável (null, texto, notas
+    // incompletas...): edição manual ou versão antiga não pode quebrar as telas
+    return Array.isArray(data) ? data.filter(isUsableEntry) : []
   } catch {
     // localStorage indisponível (anônimo/bloqueado) ou conteúdo corrompido
     return []
   }
+}
+
+// Validação leve do que vem do localStorage: só confere o que as telas
+// precisam (objeto, nota geral e as notas de todos os temas).
+function isUsableEntry(e) {
+  if (!e || typeof e !== 'object' || Array.isArray(e)) return false
+  if (!isScore(e.overall)) return false
+  const ts = e.themeScores
+  if (!ts || typeof ts !== 'object' || Array.isArray(ts)) return false
+  return THEMES.every(th => isScore(ts[th]))
+}
+
+// Aplica o limite por empresa: de cada empresa ficam as MAX_HISTORY
+// avaliações mais recentes; as demais empresas não são afetadas.
+function trimPerCompany(list) {
+  const sorted = sortChrono(list)
+  const count = new Map()
+  const keep = []
+  for (let i = sorted.length - 1; i >= 0; i -= 1) {
+    const key = companyKey(sorted[i].companyName)
+    const n = count.get(key) || 0
+    if (n < MAX_HISTORY) {
+      keep.push(sorted[i])
+      count.set(key, n + 1)
+    }
+  }
+  return keep.reverse()
 }
 
 function writeAll(list) {
@@ -101,11 +138,11 @@ function withDefaults(entry) {
 }
 
 export function loadCompanyName() {
-  try { return localStorage.getItem(COMPANY_KEY) || '' } catch { return '' }
+  try { return (localStorage.getItem(COMPANY_KEY) || '').slice(0, MAX_COMPANY_LENGTH) } catch { return '' }
 }
 
 export function saveCompanyName(name) {
-  try { localStorage.setItem(COMPANY_KEY, name) } catch { /* ignorado */ }
+  try { localStorage.setItem(COMPANY_KEY, String(name || '').slice(0, MAX_COMPANY_LENGTH)) } catch { /* ignorado */ }
 }
 
 export function loadTheme() {
@@ -125,20 +162,25 @@ export function loadHistory(companyName) {
   return sortChrono(out.filter(e => e && sameCompany(e.companyName, companyName)).map(withDefaults))
 }
 
-// Grava uma nova avaliação e devolve { id, history } da empresa.
+// Grava uma nova avaliação e devolve { id, history, persisted } da empresa.
+// persisted = false quando o navegador não deixou gravar (cota cheia ou
+// armazenamento bloqueado): a avaliação existe só em memória, e quem chama
+// precisa avisar o usuário.
 export function saveAssessment(entry) {
   const { out } = migrate(readAll())
   const record = { ...entry, id: entry.id || newId() }
   out.push(record)
-  const trimmed = sortChrono(out).slice(-MAX_HISTORY)
+  const trimmed = trimPerCompany(out)
+  let persisted = true
   try {
     writeAll(trimmed)
   } catch {
-    // não foi possível persistir: a tela de resultados ainda mostra os dados
+    persisted = false
   }
   return {
     id: record.id,
-    history: trimmed.filter(e => sameCompany(e.companyName, entry.companyName)).map(withDefaults)
+    history: trimmed.filter(e => sameCompany(e.companyName, entry.companyName)).map(withDefaults),
+    persisted
   }
 }
 
@@ -332,10 +374,10 @@ export function applyImport(companyName, incoming, strategy) {
     throw new Error('Estratégia de importação desconhecida.')
   }
 
-  const next = sortChrono(others.concat(nextMine))
-  if (next.length > MAX_HISTORY) {
-    throw new Error(`A importação ultrapassaria o limite de ${MAX_HISTORY} avaliações armazenadas.`)
+  if (nextMine.length > MAX_HISTORY) {
+    throw new Error(`A importação ultrapassaria o limite de ${MAX_HISTORY} avaliações por empresa.`)
   }
+  const next = sortChrono(others.concat(nextMine))
   try {
     writeAll(next)
   } catch {

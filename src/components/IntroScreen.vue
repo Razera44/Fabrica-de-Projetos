@@ -72,6 +72,7 @@
                 class="ifield__input"
                 type="text"
                 autocomplete="organization"
+                maxlength="80"
                 placeholder="ex: padaria bom trigo ltda"
                 @keyup.enter="handleStart"
               >
@@ -178,7 +179,8 @@ export default {
         this.$refs.responsavelInput.focus()
         return
       }
-      this.$emit('start', { name: this.name.trim(), responsavel: this.responsavel.trim() })
+      // o maxlength não cobre um nome antigo vindo do armazenamento
+      this.$emit('start', { name: this.name.trim().slice(0, 80), responsavel: this.responsavel.trim() })
     },
     // Enter inicia mesmo com o foco fora do campo; sem nome, foca o campo
     onKey(event) {
