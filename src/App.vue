@@ -51,6 +51,7 @@
             :overall="overall"
             :history="history"
             :current-id="currentId"
+            :persisted="persisted"
             @history-updated="history = $event"
             :questions="questions"
             :answers="answers"
@@ -90,6 +91,8 @@ export default {
       history: [],
       // id da avaliação feita nesta sessão (a "atual" no histórico)
       currentId: '',
+      // false quando o navegador não deixou gravar a avaliação atual
+      persisted: true,
       themeScores: {},
       overall: 0,
       // sentido da última navegação: define de que lado o próximo card entra
@@ -158,6 +161,7 @@ export default {
         responsavel: this.responsavel
       })
       this.currentId = saved.id
+      this.persisted = saved.persisted
       this.history = saved.history
       this.view = 'results'
     },

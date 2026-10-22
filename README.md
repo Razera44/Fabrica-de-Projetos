@@ -16,7 +16,9 @@ sem precisar contratar uma consultoria.
 5. O tema com menor nota é destacado como "mais frágil", e um plano de ação é montado
    automaticamente, priorizado do tema mais fraco para o mais forte.
 6. Cada avaliação concluída é salva no `localStorage` do navegador, permitindo comparar
-   a evolução da nota ao longo do tempo.
+   a evolução da nota ao longo do tempo. O histórico guarda até 200 avaliações **por empresa**
+   (a mais antiga da própria empresa sai primeiro; outras empresas não são afetadas). Se o
+   navegador não deixar gravar (cota cheia), a tela de resultados avisa.
 
 ## Stack
 

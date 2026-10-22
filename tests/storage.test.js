@@ -4,7 +4,7 @@ import { questions } from '../src/data/questions.js'
 import { computeThemeScores, computeOverallScore } from '../src/utils/scoring.js'
 import {
   saveAssessment, loadHistory, buildExport, parseImport, planImport, applyImport,
-  sortChrono, SCHEMA_VERSION
+  sortChrono, loadCompanyName, saveCompanyName, SCHEMA_VERSION, MAX_HISTORY, MAX_COMPANY_LENGTH
 } from '../src/utils/storage.js'
 
 function entry(date, answers, extra = {}) {
@@ -107,5 +107,76 @@ describe('armazenamento e exportação/importação', () => {
   it('sortChrono põe datas inválidas no fim', () => {
     const s = sortChrono([{ date: 'x' }, { date: '2026-02-01' }, { date: '2026-01-01' }])
     expect(s.map(e => e.date)).toEqual(['2026-01-01', '2026-02-01', 'x'])
+  })
+
+  // --- auditoria de validações ------------------------------------------
+
+  it('elementos null/lixo no histórico salvo não quebram leitura, gravação nem importação', () => {
+    const good = { ...entry('2026-01-01T10:00:00Z', MID), id: 'ok' }
+    store.set('segura_historico', JSON.stringify([null, 5, 'texto', [], good]))
+    expect(loadHistory('ACME')).toHaveLength(1)
+    expect(() => saveAssessment(entry('2026-02-01T10:00:00Z', ALL_GOOD))).not.toThrow()
+    store.set('segura_historico', JSON.stringify([null, good]))
+    const incoming = parseImport(JSON.stringify(buildExport('ACME', [entry('2026-03-01T10:00:00Z', ALL_BAD, { id: 'novo' })], 20)), questions).valid
+    expect(() => applyImport('ACME', incoming, 'merge')).not.toThrow()
+    expect(loadHistory('ACME').map(e => e.id)).toEqual(['ok', 'novo'])
+  })
+
+  it('descarta ao ler registros com notas incompletas ou inválidas', () => {
+    const good = { ...entry('2026-01-01T10:00:00Z', MID), id: 'ok' }
+    const semTema = { ...entry('2026-01-02T10:00:00Z', MID), id: 'a', themeScores: { Backup: 50, Senhas: 50 } }
+    const semNotas = { ...entry('2026-01-03T10:00:00Z', MID), id: 'b', themeScores: undefined }
+    const overallTexto = { ...entry('2026-01-04T10:00:00Z', MID), id: 'c', overall: '50' }
+    store.set('segura_historico', JSON.stringify([semTema, good, semNotas, overallTexto]))
+    expect(loadHistory('ACME').map(e => e.id)).toEqual(['ok'])
+  })
+
+  it('avisa quando não consegue gravar (persisted = false) e mantém a avaliação em memória', () => {
+    const ok = saveAssessment(entry('2026-01-01T10:00:00Z', MID))
+    expect(ok.persisted).toBe(true)
+
+    globalThis.localStorage.setItem = () => { throw new Error('QuotaExceededError') }
+    const r = saveAssessment(entry('2026-02-01T10:00:00Z', ALL_GOOD))
+    expect(r.persisted).toBe(false)
+    expect(r.history).toHaveLength(2)
+    expect(r.history.some(e => e.id === r.id)).toBe(true)
+  })
+
+  it('o limite de avaliações vale por empresa e não apaga dados de outra', () => {
+    const day = 24 * 3600 * 1000
+    const base = Date.UTC(2025, 0, 1)
+    const many = Array.from({ length: MAX_HISTORY }, (_, i) =>
+      ({ ...entry(new Date(base + i * day).toISOString(), MID), id: `a-${i}` }))
+    store.set('segura_historico', JSON.stringify(many))
+
+    // outra empresa não descarta nada da ACME
+    saveAssessment(entry('2026-06-01T10:00:00Z', ALL_GOOD, { companyName: 'Outra' }))
+    expect(loadHistory('ACME')).toHaveLength(MAX_HISTORY)
+    expect(loadHistory('Outra')).toHaveLength(1)
+
+    // a própria empresa passa do limite: só a mais antiga dela sai
+    saveAssessment(entry('2026-07-01T10:00:00Z', ALL_BAD))
+    const acme = loadHistory('ACME')
+    expect(acme).toHaveLength(MAX_HISTORY)
+    expect(acme[0].id).toBe('a-1')
+    expect(loadHistory('Outra')).toHaveLength(1)
+  })
+
+  it('importar para uma empresa não esbarra no limite causado por outras empresas', () => {
+    const day = 24 * 3600 * 1000
+    const base = Date.UTC(2025, 0, 1)
+    const many = Array.from({ length: MAX_HISTORY }, (_, i) =>
+      ({ ...entry(new Date(base + i * day).toISOString(), MID, { companyName: 'Outra' }), id: `o-${i}` }))
+    store.set('segura_historico', JSON.stringify(many))
+    const incoming = parseImport(JSON.stringify(buildExport('ACME', [entry('2026-03-01T10:00:00Z', ALL_BAD, { id: 'novo' })], 20)), questions).valid
+    const res = applyImport('ACME', incoming, 'merge')
+    expect(res.added).toBe(1)
+    expect(loadHistory('Outra')).toHaveLength(MAX_HISTORY)
+  })
+
+  it('nome da empresa é limitado a 80 caracteres ao ser lido', () => {
+    saveCompanyName('x'.repeat(200))
+    expect(loadCompanyName()).toHaveLength(MAX_COMPANY_LENGTH)
+    expect(MAX_COMPANY_LENGTH).toBe(80)
   })
 })

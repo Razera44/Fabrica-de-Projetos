@@ -10,6 +10,12 @@
       <!-- 00 + 01: cabeçalho do relatório. Lado a lado no desktop, onde
            cabem confortavelmente como um par — identificação explica o
            medidor ao lado, em vez de rolar a tela entre os dois. -->
+      <p v-if="!persisted" class="results__warn rise" style="--i: 0" role="alert">
+        <b>Não foi possível salvar esta avaliação.</b>
+        O armazenamento do navegador está cheio ou bloqueado: ela aparece aqui,
+        mas some ao recarregar a página. Exporte os dados para não perdê-la.
+      </p>
+
       <div class="results__row">
         <!-- 00 · identificação -->
         <div class="frame mod rise" style="--i: 0">
@@ -253,6 +259,11 @@ export default {
     currentId: {
       type: String,
       default: ''
+    },
+    // false = a avaliação atual não foi gravada no navegador
+    persisted: {
+      type: Boolean,
+      default: true
     }
   },
   emits: ['restart', 'home', 'history-updated'],
@@ -375,6 +386,20 @@ export default {
    continuam empilhados, um por vez, como sempre. */
 .results__row {
   display: contents;
+}
+
+.results__warn {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--warn);
+  background: var(--warn-bg);
+  color: var(--ink);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.results__warn b {
+  color: var(--warn);
 }
 
 .results__company {

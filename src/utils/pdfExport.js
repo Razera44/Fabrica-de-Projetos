@@ -228,7 +228,10 @@ export function exportResultsPdf({
   doc.setFont(FONT, 'bold')
   doc.setFontSize(13)
   doc.setTextColor(...INK)
-  doc.text(companyName || 'Empresa', marginX, y)
+  // nome longo quebra em mais de uma linha em vez de estourar a página
+  const nameLines = doc.splitTextToSize(companyName || 'Empresa', contentWidth)
+  doc.text(nameLines, marginX, y)
+  y += (nameLines.length - 1) * 16
 
   doc.setFont(FONT, 'normal')
   doc.setFontSize(8.5)
@@ -461,7 +464,9 @@ export function exportResultsPdf({
     doc.setFont(FONT, 'normal')
     doc.setFontSize(7.5)
     doc.setTextColor(...INK_LO)
-    doc.text(`SEGURA. · ${companyName || 'Empresa'} · ${issuedAt}`, marginX, 820, { charSpace: 0.3 })
+    // uma linha só, sem invadir a numeração de página à direita
+    const footerText = `SEGURA. · ${companyName || 'Empresa'} · ${issuedAt}`
+    doc.text(doc.splitTextToSize(footerText, contentWidth - 80)[0], marginX, 820, { charSpace: 0.3 })
     doc.text(`${i}/${total}`, pageWidth - marginX, 820, { align: 'right' })
   }
 
