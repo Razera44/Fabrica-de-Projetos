@@ -18,9 +18,9 @@
         <div class="hatch"></div>
 
         <div class="done__body">
-          <p class="display done__title rise" style="--i: 1">
+          <h1 class="display done__title rise" style="--i: 1">
             <span class="done__caret" aria-hidden="true">&gt;</span>Todos os {{ total }} itens respondidos
-          </p>
+          </h1>
 
           <div class="done__log rise" style="--i: 2">
             <div class="readout">

@@ -127,8 +127,11 @@ export default {
       if (this.delta < 0) return `▼ −${Math.abs(this.delta)}`
       return '■ ±0'
     },
+    // cor do rótulo da faixa: versão para texto, que no tema claro é mais
+    // escura que a do arco (o comentário do markerColor abaixo já previa
+    // essa separação; agora ela existe de fato nos tokens)
     tierColor() {
-      return `var(--${this.tier.tone})`
+      return `var(--${this.tier.tone}-ink)`
     },
     // marcador na cor do arco (mais viva que a do texto, que precisa de contraste)
     markerColor() {
@@ -283,8 +286,8 @@ export default {
 }
 
 .gauge__delta span { color: var(--ink-lo); }
-.gauge__delta.is-up { color: var(--safe); }
-.gauge__delta.is-down { color: var(--crit); }
+.gauge__delta.is-up { color: var(--safe-ink); }
+.gauge__delta.is-down { color: var(--crit-ink); }
 .gauge__delta.is-flat { color: var(--ink-lo); }
 
 .gauge__dot {

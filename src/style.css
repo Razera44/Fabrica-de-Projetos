@@ -6,6 +6,12 @@
    ============================================================ */
 
 :root {
+  /* O escuro é a base; o bloco [data-theme='light'] mais abaixo troca a
+     paleta. Declarar color-scheme faz a barra de rolagem e os controles
+     nativos do navegador nascerem escuros junto com a interface — sem
+     isso eles ficavam claros sobre o painel escuro. */
+  color-scheme: dark;
+
   /* superfícies
      A tela embutida (--panel-deep) é MAIS ESCURA que o fundo da página:
      é isso que faz o texto branco destacar. As fichas ficam um degrau
@@ -22,11 +28,18 @@
   --line-soft: rgba(255, 255, 255, 0.07);
   --line-strong: rgba(255, 255, 255, 0.26);
 
-  /* texto */
+  /* texto
+     Os quatro níveis foram medidos sobre as superfícies escuras: #f4f4f2
+     precisa de alfa 0,48 para alcançar 4,5:1, então os alfas antigos
+     (0,44 e 0,20) reprovavam em AA — o segundo chegava a 1,8:1. A escala
+     foi reerguida acima desse piso mantendo quatro degraus distinguíveis
+     (≈11,8 / 7,9 / 5,2 sobre --panel), no mesmo formato que o tema claro
+     já usava. Medido sobre --panel-strong, a superfície mais clara do
+     escuro, que é o pior caso. */
   --ink: #f4f4f2;
-  --ink-mid: rgba(244, 244, 242, 0.66);
-  --ink-lo: rgba(244, 244, 242, 0.44);
-  --ink-faint: rgba(244, 244, 242, 0.2);
+  --ink-mid: rgba(244, 244, 242, 0.82);
+  --ink-lo: rgba(244, 244, 242, 0.66);
+  --ink-faint: rgba(244, 244, 242, 0.52);
 
   /* acento */
   --accent: #ffffff;
@@ -46,6 +59,17 @@
   --g-crit: #e2707a;
   --g-warn: #e5bb63;
   --g-safe: #4fdd76;
+
+  /* as mesmas faixas, porém para TEXTO.
+     Marca gráfica e texto têm exigências diferentes (3:1 e 4,5:1), e no
+     tema claro a mesma cor não atende às duas. No escuro as faixas já
+     passam folgado em texto, então aqui os dois jogos coincidem; é o
+     bloco claro que os separa. */
+  --crit-ink: var(--crit);
+  --warn-ink: var(--warn);
+  --safe-ink: var(--safe);
+  --ref-ink: var(--ref);
+  --neutral-ink: var(--neutral);
 
   /* série de referência/comparação (azul): nunca se confunde com as
      faixas de risco, que usam verde/âmbar/vermelho */
@@ -112,7 +136,9 @@
   --ink: #14161a;
   --ink-mid: rgba(20, 22, 26, 0.76);
   --ink-lo: rgba(20, 22, 26, 0.66);
-  --ink-faint: rgba(20, 22, 26, 0.6);
+  /* 0,60 rendia 4,43:1 sobre --bg (#ebe9e3), 0,07 abaixo do minimo de
+     texto; 0,64 sobe para 5,03:1 no pior caso */
+  --ink-faint: rgba(20, 22, 26, 0.64);
 
   --accent: #14161a;
   --accent-ink: #f4f3ef;
@@ -139,6 +165,19 @@
   --ref-bg: rgba(59, 130, 246, 0.1);
   --neutral: #64748b;
   --neutral-rgb: 100, 116, 139;
+
+  /* As mesmas faixas em versão para TEXTO. Medido sobre as três
+     superfícies claras, a paleta acima rende, no pior caso (--bg
+     #ebe9e3): âmbar 1,77:1, verde 1,88:1, vermelho 3,10:1, azul 3,03:1,
+     cinza 3,92:1 — nenhuma alcança os 4,5:1 exigidos de texto. Os passos
+     800/700 abaixo mantêm o mesmo matiz e passam com folga, então a
+     paleta definida segue valendo para as marcas e estes tons cuidam das
+     palavras. */
+  --crit-ink: #b91c1c;    /* 5,33:1 no pior fundo claro */
+  --warn-ink: #92400e;    /* 5,84:1 */
+  --safe-ink: #166534;    /* 5,87:1 */
+  --ref-ink: #1d4ed8;     /* 5,52:1 */
+  --neutral-ink: #475569; /* 6,24:1 */
 
   --fx: 20, 22, 26;
   --ink-rgb: 20, 22, 26;
@@ -725,9 +764,14 @@ input {
   color: var(--ink-lo);
 }
 
+/* os titulos de modulo sao <h2>: sem herdar tamanho e peso, o estilo
+   padrao de cabecalho do navegador quebraria a faixa do .mhead */
 .mhead__t {
   color: var(--ink);
   white-space: nowrap;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
 }
 
 .mhead__fill {
@@ -838,12 +882,12 @@ input {
   flex-shrink: 0;
 }
 
-.tag--crit { color: var(--crit); }
-.tag--crit i { background: var(--crit); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
-.tag--warn { color: var(--warn); }
-.tag--warn i { background: var(--warn); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
-.tag--safe { color: var(--safe); }
-.tag--safe i { background: var(--safe); border-radius: 50%; }
+.tag--crit { color: var(--crit-ink); }
+.tag--crit i { background: var(--crit-ink); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.tag--warn { color: var(--warn-ink); }
+.tag--warn i { background: var(--warn-ink); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.tag--safe { color: var(--safe-ink); }
+.tag--safe i { background: var(--safe-ink); border-radius: 50%; }
 
 /* ============================================================
    BOTÕES
@@ -1038,17 +1082,7 @@ input {
    REVELAÇÃO AO ROLAR — bidirecional
    ============================================================ */
 
-.reveal {
-  opacity: 0;
-  transform: translateY(var(--reveal-shift, 26px));
-  transition: opacity var(--dur-slow) var(--ease), transform var(--dur-slow) var(--ease);
-  will-change: opacity, transform;
-}
-
-.reveal.is-visible {
-  opacity: 1;
-  transform: translateY(0);
-}
+.reveal { will-change: opacity, transform; }
 
 /* ============================================================
    DECODIFICAÇÃO DE TEXTO (v-scramble)

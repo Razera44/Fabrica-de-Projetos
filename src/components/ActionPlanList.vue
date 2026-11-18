@@ -87,7 +87,7 @@ export default {
   font-size: 9px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--crit);
+  color: var(--crit-ink);
   border: 1px solid rgba(var(--crit-rgb), 0.45);
   padding: 1px 6px;
 }

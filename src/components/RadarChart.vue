@@ -237,16 +237,18 @@
           <b>{{ themes[active] }}</b>
           <span class="tag" :class="`tag--${tone(scores[themes[active]])}`"><i></i>{{ tierLabel(scores[themes[active]]) }}</span>
         </div>
-        <div class="readout"><span class="readout__k">Atual</span><span class="readout__dots"></span><span class="readout__v">{{ scores[themes[active]] }}/100</span></div>
-        <div class="readout"><span class="readout__k">Peso</span><span class="readout__dots"></span><span class="readout__v">{{ weight(themes[active]) }}</span></div>
+        <div class="rdr__tipsection">Nota do tema</div>
+        <div class="rdr__tiprow"><span>Atual</span><strong>{{ scores[themes[active]] }}/100</strong></div>
+        <div class="rdr__tiprow"><span>Peso no índice</span><strong>{{ weight(themes[active]) }}</strong></div>
         <template v-if="previous">
-          <div class="readout"><span class="readout__k">Ref. {{ previousDate }}</span><span class="readout__dots"></span><span class="readout__v rdr__refv">{{ previous[themes[active]] }}/100</span></div>
-          <div class="readout"><span class="readout__k">Variação</span><span class="readout__dots"></span><span class="readout__v" :class="signClass(delta(themes[active]))">{{ signed(delta(themes[active])) }} pts</span></div>
+          <div class="rdr__tipsection">Comparação · {{ previousDate }}</div>
+          <div class="rdr__tiprow"><span>Nota anterior</span><strong class="rdr__refv">{{ previous[themes[active]] }}/100</strong></div>
+          <div class="rdr__tiprow"><span>Variação</span><strong :class="signClass(delta(themes[active]))">{{ signed(delta(themes[active])) }} pts</strong></div>
           <!-- quanto essa variação move o índice geral (variação × peso) -->
-          <div class="readout"><span class="readout__k">No índice geral</span><span class="readout__dots"></span><span class="readout__v" :class="signClass(delta(themes[active]))">{{ impactText(themes[active]) }} pts</span></div>
+          <div class="rdr__tiprow"><span>Impacto no índice</span><strong :class="signClass(delta(themes[active]))">{{ impactText(themes[active]) }} pts</strong></div>
         </template>
-        <div v-else class="readout"><span class="readout__k">Referência</span><span class="readout__dots"></span><span class="readout__v">Sem referência</span></div>
-        <div class="readout"><span class="readout__k">Respostas seguras</span><span class="readout__dots"></span><span class="readout__v">{{ answeredLine(themes[active]) }}</span></div>
+        <div v-else class="rdr__tiprow"><span>Comparação</span><strong>Sem referência</strong></div>
+        <div class="rdr__tiprow"><span>Respostas seguras</span><strong>{{ answeredLine(themes[active]) }}</strong></div>
       </div>
       </div>
     </div>
@@ -1030,8 +1032,8 @@ export default {
 
 .rdr__sd--muted { color: var(--ink-lo); text-transform: uppercase; letter-spacing: 0.14em; font-size: 9px; }
 
-.is-up { color: var(--safe); fill: var(--safe); }
-.is-down { color: var(--crit); fill: var(--crit); }
+.is-up { color: var(--safe-ink); fill: var(--safe-ink); }
+.is-down { color: var(--crit-ink); fill: var(--crit-ink); }
 .is-flat { color: var(--ink-lo); fill: var(--ink-lo); }
 
 .rdr__list {
@@ -1191,14 +1193,14 @@ export default {
 .rdr__tip {
   position: absolute;
   z-index: 3;
-  width: 210px;
-  padding: 10px 12px 8px;
+  width: min(320px, calc(100vw - 32px));
+  padding: 16px 18px;
   background: var(--panel-deep);
   border: 1px solid var(--line-strong);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
   pointer-events: none;
   display: grid;
-  gap: 4px;
+  gap: 9px;
 }
 
 .rdr__tip--r { transform: translate(14px, -50%); }
@@ -1216,11 +1218,14 @@ export default {
   color: var(--ink);
 }
 
-.rdr__tip .readout { font-size: 9.5px; }
-.rdr__refv { color: var(--ref) !important; }
+.rdr__tipsection { margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--line-soft); color: var(--neutral); font-size: 10px; text-transform: uppercase; letter-spacing: .1em; }
+.rdr__tiprow { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 12px; letter-spacing: .02em; }
+.rdr__tiprow span { min-width: 0; overflow-wrap: anywhere; }
+.rdr__tiprow strong { flex: none; color: var(--ink); white-space: nowrap; }
+.rdr__refv { color: var(--ref-ink) !important; }
 
 @media (max-width: 560px) {
-  .rdr__tip { width: 180px; }
+  .rdr__tip { width: min(320px, calc(100vw - 32px)); }
   .rdr__tip--r, .rdr__tip--l { left: 50% !important; transform: translate(-50%, 18px); }
 }
 

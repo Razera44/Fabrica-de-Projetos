@@ -72,3 +72,10 @@ src/
 - Permitir exportar o resultado em PDF.
 - Trocar o `localStorage` por um backend, caso precise comparar várias empresas
   ou acessar o histórico de outro dispositivo.
+# API e assistente
+
+O back-end ASP.NET está em `backend/`. Configure a conexão MySQL `ConnectionStrings__Local` no ambiente. Execute `npm run dev` na raiz do projeto: esse comando inicia a API na porta 5000, inicia o Vite e abre o site no navegador. Se a API já estiver ativa na porta 5000, ela será reutilizada. Avaliações concluídas continuam salvas no navegador e também são enviadas à API quando o banco está disponível.
+
+Para ativar o assistente, abra `backend/ai.local.json` e substitua `COLE_SUA_API_KEY_AQUI` pela chave do Gemini. O modelo Gemini configurado já está definido. Reinicie a API após preencher a chave. O arquivo é ignorado pelo Git; não envie a chave ao repositório.
+
+Em produção, defina `VITE_API_URL` para a URL pública da API ou encaminhe `/api` no servidor web. Restrinja as origens CORS em `backend/Program.cs` ao domínio publicado.

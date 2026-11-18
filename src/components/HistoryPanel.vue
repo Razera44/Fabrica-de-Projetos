@@ -80,7 +80,9 @@
             @keydown.right.prevent="move(i, 1)"
             @keydown.esc="hover = null"
           >
-            <circle :cx="x(i)" :cy="y(p.overall)" r="14" class="hp__hit" />
+            <!-- área de toque: o SVG encolhe com a tela, e em 375px o raio de 14
+                 rendia só 22px de alvo, abaixo dos 24px exigidos pela WCAG 2.5.8 -->
+            <circle :cx="x(i)" :cy="y(p.overall)" r="18" class="hp__hit" />
             <circle :cx="x(i)" :cy="y(p.overall)" :r="p.id === stats.current?.id ? 6 : 4.5" class="hp__dot" />
             <circle v-if="p.id === referenceId" :cx="x(i)" :cy="y(p.overall)" r="9.5" class="hp__refring" />
             <text
@@ -284,8 +286,8 @@ export default {
   text-overflow: ellipsis;
 }
 
-.is-up { color: var(--safe) !important; }
-.is-down { color: var(--crit) !important; }
+.is-up { color: var(--safe-ink) !important; }
+.is-down { color: var(--crit-ink) !important; }
 .is-flat { color: var(--ink-lo) !important; }
 
 .hp__empty,
@@ -297,7 +299,7 @@ export default {
   color: var(--ink-lo);
 }
 
-.hp__note--warn { color: var(--warn); }
+.hp__note--warn { color: var(--warn-ink); }
 
 .hp__chartwrap {
   position: relative;
@@ -393,7 +395,7 @@ export default {
 }
 
 .hp__tip strong { color: var(--ink); }
-.hp__tip em { font-style: normal; color: var(--ref); }
+.hp__tip em { font-style: normal; color: var(--ref-ink); }
 .hp__muted { color: var(--ink-lo); }
 
 .hp__log {
@@ -452,7 +454,7 @@ export default {
 
 .hp__use:hover,
 .hp__use:focus-visible {
-  color: var(--ref);
+  color: var(--ref-ink);
   border-color: var(--ref);
   outline: none;
 }

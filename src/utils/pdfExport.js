@@ -16,17 +16,17 @@ import { AZERET_MONO_SEMIBOLD_BASE64 } from './fonts/azeretMonoSemiBold.js'
 // Paleta extraída de src/style.css. Os tons de --line/--ink que na tela são
 // brancos com opacidade (sobre fundo escuro) viram aqui cinzas sólidos
 // equivalentes, já que o PDF não compõe transparência do mesmo jeito.
-const BG = [8, 9, 10] // --bg
-const PANEL = [13, 14, 15] // --panel
-const LINE = [70, 70, 70] // ~--line-strong sobre --bg
-const LINE_SOFT = [38, 38, 38] // ~--line sobre --bg
-const INK = [244, 244, 242] // --ink
-const INK_MID = [176, 176, 174] // ~--ink-mid sobre --bg
-const INK_LO = [134, 134, 132] // ~--ink-lo sobre --bg
+const BG = [255, 255, 255]
+const PANEL = [248, 249, 250]
+const LINE = [110, 116, 122]
+const LINE_SOFT = [215, 219, 223]
+const INK = [24, 29, 33]
+const INK_MID = [65, 72, 78]
+const INK_LO = [91, 99, 106]
 
-const CRIT = [226, 112, 122]
-const WARN = [229, 187, 99]
-const SAFE = [79, 221, 118]
+const CRIT = [170, 44, 57]
+const WARN = [151, 99, 13]
+const SAFE = [18, 121, 58]
 const REF = [59, 130, 246] // azul de referência (#3B82F6)
 const TONE_COLOR = { crit: CRIT, warn: WARN, safe: SAFE }
 const TONE_LABEL = { crit: 'Crítico', warn: 'Importante', safe: 'Recomendado' }

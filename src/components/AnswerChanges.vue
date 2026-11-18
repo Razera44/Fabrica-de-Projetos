@@ -251,8 +251,8 @@ export default {
 .chg__clear::before { content: '× '; }
 .chg__clear:hover { color: var(--ink); border-color: var(--ink-mid); }
 
-.is-up { color: var(--safe); }
-.is-down { color: var(--crit); }
+.is-up { color: var(--safe-ink); }
+.is-down { color: var(--crit-ink); }
 .is-flat { color: var(--ink-lo); }
 
 .chg__gh {

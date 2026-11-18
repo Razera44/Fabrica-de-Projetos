@@ -385,7 +385,7 @@ export default {
   display: flex;
   align-items: flex-start;
   gap: 7px;
-  color: var(--crit);
+  color: var(--crit-ink);
   animation: rise var(--dur) var(--ease) both;
 }
 

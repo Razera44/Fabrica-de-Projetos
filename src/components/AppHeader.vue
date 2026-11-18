@@ -14,6 +14,10 @@
       <span class="bar__tag">Diagnóstico de segurança digital</span>
       <span class="bar__strip"></span>
 
+      <!-- três estados em ciclo: automático -> claro -> escuro -> automático.
+           O automático vem primeiro porque é o padrão e porque a ordem da
+           esquerda para a direita é a mesma do ciclo, o que torna o próximo
+           clique previsível. -->
       <button
         class="theme-toggle"
         :class="{ 'is-light': isLight }"
@@ -23,15 +27,21 @@
         @click="toggleTheme"
       >
         <span class="theme-toggle__track" aria-hidden="true">
-          <span class="theme-toggle__opt" :class="{ 'is-on': !isLight }">
+          <span class="theme-toggle__opt" :class="{ 'is-on': modo === 'auto' }">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-              <path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+              <circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="2"/>
+              <path d="M12 3.5a8.5 8.5 0 0 1 0 17Z" fill="currentColor"/>
             </svg>
           </span>
-          <span class="theme-toggle__opt" :class="{ 'is-on': isLight }">
+          <span class="theme-toggle__opt" :class="{ 'is-on': modo === 'light' }">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
               <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2"/>
               <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span class="theme-toggle__opt" :class="{ 'is-on': modo === 'dark' }">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+              <path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
             </svg>
           </span>
         </span>
@@ -59,9 +69,20 @@
 </template>
 
 <script>
-import { loadTheme, saveTheme } from '../utils/storage.js'
+import { loadTheme, loadThemePreference, systemTheme, saveTheme, clearTheme } from '../utils/storage.js'
 
 const META_COLOR = { dark: '#0a0a0a', light: '#ebe9e3' }
+
+// O ciclo do seletor. 'auto' não grava nada e segue o navegador; os outros
+// dois gravam e passam a mandar. Ter 'auto' no ciclo é o que permite voltar
+// atrás: sem ele, o primeiro clique prendia o tema para sempre.
+const CICLO = { auto: 'light', light: 'dark', dark: 'auto' }
+
+const ROTULO = {
+  auto: 'Tema: automático, seguindo o navegador. Mudar para o tema claro.',
+  light: 'Tema: claro. Mudar para o tema escuro.',
+  dark: 'Tema: escuro. Voltar para o automático.'
+}
 
 export default {
   name: 'AppHeader',
@@ -83,7 +104,10 @@ export default {
       // identificador da execução: decorativo, dá contexto de sessão
       sessionId: '0x' + Math.floor(Math.random() * 0xfff).toString(16).toUpperCase().padStart(3, '0'),
       startedAt: `${p(d.getHours())}:${p(d.getMinutes())}`,
-      // o index.html já aplicou o tema salvo; aqui só se lê o estado atual
+      // modo escolhido: 'auto' | 'light' | 'dark'. Sem chave gravada, é automático.
+      modo: loadThemePreference() || 'auto',
+      // tema realmente aplicado agora. O index.html já resolveu isso antes da
+      // primeira pintura; aqui só se lê o estado, sem recalcular.
       theme: document.documentElement.getAttribute('data-theme') || loadTheme()
     }
   },
@@ -92,27 +116,58 @@ export default {
       return this.theme === 'light'
     },
     toggleLabel() {
-      return this.isLight ? 'Mudar para o tema escuro' : 'Mudar para o tema claro'
+      return ROTULO[this.modo]
+    }
+  },
+  mounted() {
+    // No modo automático o app acompanha o navegador ao vivo: o usuário troca
+    // o tema do sistema e a página acompanha, sem recarregar. Nos outros dois
+    // modos este ouvinte não faz nada — a escolha manual nunca é sobrescrita.
+    try {
+      this.mq = window.matchMedia('(prefers-color-scheme: light)')
+      this.onSystemTheme = e => {
+        if (this.modo !== 'auto') return
+        this.applyTheme(e.matches ? 'light' : 'dark')
+      }
+      this.mq.addEventListener('change', this.onSystemTheme)
+    } catch {
+      // matchMedia indisponível: segue com o tema aplicado no carregamento
     }
   },
   methods: {
-    toggleTheme() {
+    // Pinta o tema. Só mexe no DOM: quem decide o que persistir é o setModo,
+    // senão um eco do navegador viraria "escolha manual" sem o usuário pedir.
+    applyTheme(theme) {
+      if (theme === this.theme) return
       const root = document.documentElement
-      this.theme = this.isLight ? 'dark' : 'light'
+      this.theme = theme
 
       // liga a transição de cor só durante a troca
       root.classList.add('theme-fade')
-      root.setAttribute('data-theme', this.theme)
+      root.setAttribute('data-theme', theme)
       clearTimeout(this.fadeTimer)
       this.fadeTimer = setTimeout(() => root.classList.remove('theme-fade'), 320)
 
       const meta = document.querySelector('meta[name="theme-color"]')
-      if (meta) meta.setAttribute('content', META_COLOR[this.theme])
-      saveTheme(this.theme)
+      if (meta) meta.setAttribute('content', META_COLOR[theme])
+    },
+    setModo(modo) {
+      this.modo = modo
+      if (modo === 'auto') {
+        clearTheme()
+        this.applyTheme(systemTheme())
+      } else {
+        saveTheme(modo)
+        this.applyTheme(modo)
+      }
+    },
+    toggleTheme() {
+      this.setModo(CICLO[this.modo])
     }
   },
   beforeUnmount() {
     clearTimeout(this.fadeTimer)
+    if (this.mq && this.onSystemTheme) this.mq.removeEventListener('change', this.onSystemTheme)
   }
 }
 </script>
@@ -354,5 +409,12 @@ export default {
 @media (max-width: 420px) {
   .bar__badge { font-size: 10.5px; padding-right: 20px; }
   .bar__seg--company .bar__dots { display: none; }
+
+  /* O terceiro estado do seletor somou 28px à fileira, e em 320px isso
+     passava 11px da largura da tela. Aqui as células encolhem e o vão entre
+     os blocos aperta: medido em 320px, a fileira volta para 303px. */
+  .bar__top { gap: 10px; }
+  .theme-toggle { padding: 0 4px; }
+  .theme-toggle__opt { width: 24px; }
 }
 </style>

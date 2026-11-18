@@ -29,7 +29,7 @@
             </div>
             <div class="hatch"></div>
             <div class="mbody">
-              <h2 class="display results__company" v-scramble="{ delay: 300, duration: 1900 }">{{ companyName }}</h2>
+              <h1 class="display results__company" v-scramble="{ delay: 300, duration: 1900 }">{{ companyName }}</h1>
               <div class="results__meta">
                 <div class="readout">
                   <span class="readout__k">Emitido</span><span class="readout__dots"></span><span class="readout__v">{{ issuedAt }}</span>
@@ -51,7 +51,7 @@
           <div class="frame__in">
             <div class="mhead">
               <span class="index">01</span>
-              <span class="mhead__t">Índice geral</span>
+              <h2 class="mhead__t">Índice geral</h2>
               <span class="mhead__fill"></span>
               <span class="mhead__meta">0 – 100</span>
             </div>
@@ -72,7 +72,7 @@
         <div class="frame__in">
           <div class="mhead">
             <span class="index">02</span>
-            <span class="mhead__t" v-scramble>Radar comparativo</span>
+            <h2 class="mhead__t" v-scramble>Radar comparativo</h2>
             <span class="mhead__fill"></span>
             <label v-if="compareOptions.length" class="cmp">
               <span class="cmp__k">Comparar com</span>
@@ -101,7 +101,7 @@
           <div class="frame__in">
             <div class="mhead">
               <span class="index">03</span>
-              <span class="mhead__t" v-scramble>Notas por tema</span>
+              <h2 class="mhead__t" v-scramble>Notas por tema</h2>
               <span class="mhead__fill"></span>
               <span class="mhead__meta mhead__meta--long">Do mais frágil ao mais forte</span>
             </div>
@@ -124,7 +124,7 @@
           <div class="frame__in">
             <div class="mhead">
               <span class="index">04</span>
-              <span class="mhead__t" v-scramble>Plano de ação</span>
+              <h2 class="mhead__t" v-scramble>Plano de ação</h2>
               <span class="mhead__fill"></span>
               <span class="mhead__meta">{{ actionPlan.length }} itens</span>
             </div>
@@ -139,7 +139,7 @@
         <div class="frame__in">
           <div class="mhead">
             <span class="index">05</span>
-            <span class="mhead__t" v-scramble>Mudanças nas respostas</span>
+            <h2 class="mhead__t" v-scramble>Mudanças nas respostas</h2>
             <span class="mhead__fill"></span>
             <span class="mhead__meta mhead__meta--long">vs {{ previousDate }}</span>
           </div>
@@ -157,7 +157,7 @@
         <div class="frame__in">
           <div class="mhead">
             <span class="index">{{ previousEntry ? '06' : '05' }}</span>
-            <span class="mhead__t" v-scramble>Histórico</span>
+            <h2 class="mhead__t" v-scramble>Histórico</h2>
             <span class="mhead__fill"></span>
             <span class="mhead__meta">{{ history.length === 1 ? '1 avaliação' : `${history.length} avaliações` }}</span>
           </div>
@@ -176,7 +176,7 @@
         <div class="frame__in">
           <div class="mhead">
             <span class="index">{{ previousEntry ? '07' : '06' }}</span>
-            <span class="mhead__t" v-scramble>Arquivos</span>
+            <h2 class="mhead__t" v-scramble>Arquivos</h2>
             <span class="mhead__fill"></span>
             <span class="mhead__meta mhead__meta--long">Relatório e backup</span>
           </div>
@@ -399,7 +399,7 @@ export default {
 }
 
 .results__warn b {
-  color: var(--warn);
+  color: var(--warn-ink);
 }
 
 .results__company {
@@ -447,7 +447,7 @@ export default {
   font-size: 10px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--crit);
+  color: var(--crit-ink);
   background: var(--panel-deep);
   border: 1px solid var(--line-strong);
   border-radius: 0;

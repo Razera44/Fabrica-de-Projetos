@@ -313,7 +313,7 @@ export default {
 }
 
 .da__strat b { color: var(--ink); }
-.da__confirm { color: var(--crit) !important; }
+.da__confirm { color: var(--crit-ink) !important; }
 
 .da__pa { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 
@@ -324,8 +324,8 @@ export default {
   letter-spacing: 0.06em;
 }
 
-.da__msg.is-ok { color: var(--safe); }
-.da__msg.is-err { color: var(--crit); }
+.da__msg.is-ok { color: var(--safe-ink); }
+.da__msg.is-err { color: var(--crit-ink); }
 .da__msg.is-info { color: var(--ink-mid); }
 
 .btn:focus-visible,

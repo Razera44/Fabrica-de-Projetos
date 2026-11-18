@@ -145,12 +145,45 @@ export function saveCompanyName(name) {
   try { localStorage.setItem(COMPANY_KEY, String(name || '').slice(0, MAX_COMPANY_LENGTH)) } catch { /* ignorado */ }
 }
 
+// Preferência MANUAL de tema, ou null quando o usuário nunca escolheu.
+// Essa distinção é o que faltava: loadTheme() devolvia 'dark' tanto para
+// "escolheu escuro" quanto para "nunca escolheu", então a preferência do
+// navegador nunca chegava a ser consultada.
+export function loadThemePreference() {
+  try {
+    const t = localStorage.getItem(THEME_KEY)
+    return t === 'light' || t === 'dark' ? t : null
+  } catch {
+    // armazenamento bloqueado (janela anônima, política do navegador):
+    // trata como "sem escolha manual" em vez de impedir o uso do app
+    return null
+  }
+}
+
+// Tema que o navegador/sistema operacional está pedindo agora.
+// Escuro é o padrão quando o navegador não informa preferência.
+export function systemTheme() {
+  try {
+    return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
+  } catch {
+    return 'dark'
+  }
+}
+
+// Tema a aplicar: a escolha manual manda; sem ela, segue o navegador.
 export function loadTheme() {
-  try { return localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark' } catch { return 'dark' }
+  return loadThemePreference() || systemTheme()
 }
 
 export function saveTheme(theme) {
   try { localStorage.setItem(THEME_KEY, theme) } catch { /* ignorado */ }
+}
+
+// Volta ao modo automático. Apagar a chave (em vez de gravar 'auto') mantém
+// uma única representação de "sem escolha manual", a mesma que o script de
+// pré-pintura do index.html já entende.
+export function clearTheme() {
+  try { localStorage.removeItem(THEME_KEY) } catch { /* ignorado */ }
 }
 
 // Histórico persistido de uma empresa, em ordem cronológica.

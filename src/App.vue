@@ -61,25 +61,29 @@
         </Transition>
       </main>
     </div>
+    <AssistantChat v-if="view === 'results'" :scores="themeScores" :company-name="companyName" />
   </div>
 </template>
 
 <script>
+import { defineAsyncComponent } from 'vue'
 import AmbientBackground from './components/AmbientBackground.vue'
 import AppHeader from './components/AppHeader.vue'
 import ProgressBand from './components/ProgressBand.vue'
 import IntroScreen from './components/IntroScreen.vue'
 import QuestionCard from './components/QuestionCard.vue'
 import DoneScreen from './components/DoneScreen.vue'
-import ResultsView from './components/ResultsView.vue'
+const ResultsView = defineAsyncComponent(() => import('./components/ResultsView.vue'))
+const AssistantChat = defineAsyncComponent(() => import('./components/AssistantChat.vue'))
 
 import { questions } from './data/questions.js'
 import { computeThemeScores, computeOverallScore } from './utils/scoring.js'
 import { loadCompanyName, saveCompanyName, loadHistory, saveAssessment } from './utils/storage.js'
+import { sendAssessment } from './utils/backend.js'
 
 export default {
   name: 'App',
-  components: { AmbientBackground, AppHeader, ProgressBand, IntroScreen, QuestionCard, DoneScreen, ResultsView },
+  components: { AmbientBackground, AppHeader, ProgressBand, IntroScreen, QuestionCard, DoneScreen, ResultsView, AssistantChat },
   data() {
     return {
       view: 'intro',
@@ -148,7 +152,7 @@ export default {
       this.current -= 1
       this.toTop()
     },
-    calculate() {
+    async calculate() {
       this.themeScores = computeThemeScores(this.questions, this.answers)
       this.overall = computeOverallScore(this.themeScores)
       const saved = saveAssessment({
@@ -164,6 +168,11 @@ export default {
       this.persisted = saved.persisted
       this.history = saved.history
       this.view = 'results'
+      try {
+        await sendAssessment(this.companyName, this.responsavel, this.answers)
+      } catch (error) {
+        console.warn('Não foi possível sincronizar a avaliação com a API:', error)
+      }
     },
     restart() {
       this.answers = new Array(this.questions.length).fill(null)

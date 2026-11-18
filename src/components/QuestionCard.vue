@@ -33,14 +33,14 @@
           <div class="qbody">
             <div class="qbody__main">
               <!-- o enunciado entra sozinho e se decodifica a partir de 1001 -->
-              <h2 class="display qprompt qstep" style="--d: 480ms">
+              <h1 class="display qprompt qstep" style="--d: 480ms">
                 <span class="qprompt__caret" aria-hidden="true">&gt;&gt;</span>
                 <span
                   :key="index"
                   class="qprompt__text"
                   v-scramble="{ delay: 500, duration: 1100 }"
                 >{{ question.text }}</span>
-              </h2>
+              </h1>
 
               <!-- lista de opções, cada uma em sua própria moldura -->
               <div class="qopts" role="radiogroup" :aria-label="question.text">

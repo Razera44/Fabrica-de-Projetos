@@ -6,15 +6,32 @@
   <title>SEGURA//DIAG — Diagnóstico de Segurança Digital</title>
   <meta name="theme-color" content="#0a0a0a">
   <script>
-    // aplica o tema salvo antes da primeira pintura (evita piscar escuro→claro).
-    // a chave é a mesma de utils/storage.js
-    try {
-      var t = localStorage.getItem('segura_tema')
-      document.documentElement.setAttribute('data-theme', t === 'light' ? 'light' : 'dark')
-      if (t === 'light') document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ebe9e3')
-    } catch (e) {
-      document.documentElement.setAttribute('data-theme', 'dark')
-    }
+    // Decide o tema ANTES da primeira pintura, para a página não nascer num
+    // tema e trocar depois. Prioridade:
+    //   1. escolha manual salva pelo usuário;
+    //   2. preferência do navegador/sistema (prefers-color-scheme);
+    //   3. escuro, quando nada disso estiver disponível.
+    // A chave é a mesma de utils/storage.js e a ordem aqui tem que ser
+    // idêntica à de loadTheme() de lá: são as duas pontas da mesma regra.
+    (function () {
+      var t = 'dark'
+      var prefereClaro = function () {
+        try {
+          return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches)
+        } catch (e) { return false }
+      }
+      try {
+        var salvo = localStorage.getItem('segura_tema')
+        t = (salvo === 'light' || salvo === 'dark') ? salvo : (prefereClaro() ? 'light' : 'dark')
+      } catch (e) {
+        // armazenamento bloqueado (janela anônima, política do navegador):
+        // ainda dá para seguir o navegador
+        t = prefereClaro() ? 'light' : 'dark'
+      }
+      document.documentElement.setAttribute('data-theme', t)
+      var meta = document.querySelector('meta[name="theme-color"]')
+      if (meta) meta.setAttribute('content', t === 'light' ? '#ebe9e3' : '#0a0a0a')
+    })()
   </script>
   <meta name="description" content="Autoavaliação de segurança digital para pequenas empresas: nota de 0 a 100 e plano de ação priorizado.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%230a0a0a'/%3E%3Crect x='7' y='7' width='18' height='18' fill='none' stroke='%23ffffff' stroke-width='2'/%3E%3Crect x='13' y='13' width='6' height='6' fill='%23ffffff'/%3E%3C/svg%3E">
